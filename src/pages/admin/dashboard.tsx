@@ -98,7 +98,7 @@ export default function AdminDashboard() {
     const fetchDbStats = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/admin/db-status');
+        const res = await fetch('/api/admin/db-monitor');
         if (!res.ok) {
           throw new Error('Failed to fetch database status');
         }
