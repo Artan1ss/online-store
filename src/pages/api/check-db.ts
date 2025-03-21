@@ -1,6 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 
+interface DatabaseInfo {
+  tables: {
+    product?: {
+      count?: number;
+      status: string;
+      error?: string;
+    };
+  };
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Create a clean Prisma client for this test
   const prisma = new PrismaClient();
@@ -14,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     connected = true;
     
     // Get some basic database info
-    const databaseInfo = {
+    const databaseInfo: DatabaseInfo = {
       tables: {}
     };
     
