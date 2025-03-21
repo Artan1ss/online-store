@@ -23,6 +23,7 @@ interface Product {
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
@@ -37,6 +38,7 @@ export default function ProductsPage() {
     const fetchProducts = async () => {
       try {
         setLoading(true);
+        setError(null);
         
         // Build query parameters
         const params = new URLSearchParams();
@@ -59,14 +61,26 @@ export default function ProductsPage() {
         params.append('maxPrice', priceRange[1].toString());
         
         const response = await fetch(`/api/products/public?${params.toString()}`);
+        
+        if (!response.ok) {
+          throw new Error(`Error fetching products: ${response.status} ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid data format received from server');
+        }
+        
         setProducts(data);
         
         // Extract all unique categories
-        const uniqueCategories = Array.from(new Set(data.map((product: Product) => product.category))) as string[];
+        const uniqueCategories = Array.from(new Set(data.map((product: Product) => product.category).filter(Boolean))) as string[];
         setCategories(uniqueCategories);
       } catch (error) {
         console.error('Error fetching products:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load products');
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -92,12 +106,12 @@ export default function ProductsPage() {
   };
 
   // Filter products
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = products ? products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                         (product.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     const matchesCategory = !selectedCategory || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
-  });
+  }) : [];
 
   // Add to cart
   const handleAddToCart = (e: React.MouseEvent, product: Product) => {
@@ -263,12 +277,28 @@ export default function ProductsPage() {
               </div>
             </div>
           </div>
+          
+          {/* Error message */}
+          {error && (
+            <div className="mt-4 p-4 border border-red-200 bg-red-50 rounded-md">
+              <p className="text-red-700">{error}</p>
+              <button 
+                className="mt-2 text-blue-600 underline"
+                onClick={() => window.location.reload()}
+              >
+                Try again
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Product list */}
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+              <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
+            </div>
+            <p className="mt-2 text-gray-600">Loading products...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
