@@ -8,7 +8,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   // Get database URL for troubleshooting (redacted for security)
-  let dbUrlInfo = 'Missing DATABASE_URL';
+  type DbUrlInfo = string | {
+    host: string;
+    database: string;
+    format: string;
+    direct_url_present: boolean;
+  };
+  
+  let dbUrlInfo: DbUrlInfo = 'Missing DATABASE_URL';
   
   if (process.env.DATABASE_URL) {
     const url = process.env.DATABASE_URL;
