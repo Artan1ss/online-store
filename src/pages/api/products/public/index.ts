@@ -1,113 +1,171 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import prisma, { executePrismaOperation } from '@/lib/db';
+import { Product } from '@prisma/client';
 
-const prisma = new PrismaClient();
+type ResponseData = {
+  status: 'success' | 'error';
+  message: string;
+  data?: any;
+  error?: string;
+  timestamp: string;
+};
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ResponseData>
+) {
+  const startTime = new Date();
+  console.log(`[Products API] Request received: ${req.method} at ${startTime.toISOString()}`);
+  
+  // Only allow GET requests
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    console.warn(`[Products API] Invalid method: ${req.method}`);
+    return res.status(405).json({
+      status: 'error',
+      message: 'Method not allowed',
+      timestamp: new Date().toISOString(),
+    });
   }
 
   try {
-    // Get query parameters
-    const { 
-      sort = 'createdAt', 
-      order = 'desc',
-      isOnSale,
-      isFeatured,
-      minPrice = '0',
-      maxPrice = '10000',
-      category,
-      search
-    } = req.query;
-
+    console.log('[Products API] Processing product request...');
+    console.log('[Products API] Query params:', req.query);
+    
+    // Parse query parameters
+    const search = req.query.search as string | undefined;
+    const category = req.query.category as string | undefined;
+    const minPrice = parseFloatSafe(req.query.minPrice as string);
+    const maxPrice = parseFloatSafe(req.query.maxPrice as string);
+    const isOnSale = req.query.isOnSale === 'true';
+    const isFeatured = req.query.isFeatured === 'true';
+    const sort = req.query.sort as string || 'name';
+    const order = req.query.order as 'asc' | 'desc' || 'asc';
+    const limit = parseInt(req.query.limit as string || '50');
+    const offset = parseInt(req.query.offset as string || '0');
+    
     // Build query conditions
-    const where: any = {
-      status: 'active',
-      stock: {
-        gt: 0,
-      },
-    };
-
-    // Price range filter
-    where.price = {
-      gte: parseFloat(minPrice as string),
-      lte: parseFloat(maxPrice as string),
-    };
-
-    // Sale items filter
-    if (isOnSale === 'true') {
-      where.isOnSale = true;
-    }
-
-    // Featured items filter
-    if (isFeatured === 'true') {
-      where.isFeatured = true;
-    }
-
-    // Category filter
-    if (category) {
-      where.category = category;
-    }
-
-    // Search filter
+    const where: any = { status: 'active' };
+    
     if (search) {
       where.OR = [
-        {
-          name: {
-            contains: search as string,
-            mode: 'insensitive',
-          },
-        },
-        {
-          description: {
-            contains: search as string,
-            mode: 'insensitive',
-          },
-        },
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
       ];
     }
-
-    // Validate sort field
-    const validSortFields = ['createdAt', 'price', 'name', 'discount'];
-    const sortField = validSortFields.includes(sort as string) ? sort : 'createdAt';
     
-    // Validate sort order
-    const sortOrder = order === 'asc' ? 'asc' : 'desc';
-
-    // Add debug log
-    console.log('Query conditions:', JSON.stringify(where));
-
-    // Execute query
-    const products = await prisma.product.findMany({
-      where,
-      orderBy: {
-        [sortField as string]: sortOrder,
+    if (category) {
+      where.category = { contains: category, mode: 'insensitive' };
+    }
+    
+    if (isOnSale) {
+      where.isOnSale = true;
+    }
+    
+    if (isFeatured) {
+      where.isFeatured = true;
+    }
+    
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.price = {};
+      
+      if (minPrice !== undefined) {
+        where.price.gte = minPrice;
+      }
+      
+      if (maxPrice !== undefined) {
+        where.price.lte = maxPrice;
+      }
+    }
+    
+    console.log('[Products API] Query conditions:', JSON.stringify(where));
+    
+    // Execute the database query with enhanced error handling
+    const products = await executePrismaOperation(async () => {
+      console.log('[Products API] Executing Prisma query...');
+      
+      return prisma.product.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          originalPrice: true,
+          discount: true,
+          isOnSale: true,
+          isFeatured: true,
+          stock: true,
+          category: true,
+          status: true,
+          images: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: {
+          [sort]: order,
+        },
+        skip: offset,
+        take: limit,
+      });
+    }, 'Failed to fetch products');
+    
+    console.log(`[Products API] Found ${products.length} products`);
+    
+    // Get total count for pagination
+    const total = await executePrismaOperation(
+      () => prisma.product.count({ where }),
+      'Failed to count products'
+    );
+    
+    console.log(`[Products API] Total product count: ${total}`);
+    
+    // Success response
+    const responseTime = new Date().getTime() - startTime.getTime();
+    console.log(`[Products API] Request completed in ${responseTime}ms`);
+    
+    return res.status(200).json({
+      status: 'success',
+      message: 'Products retrieved successfully',
+      data: {
+        products,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + products.length < total,
+        },
+        meta: {
+          responseTimeMs: responseTime,
+        }
       },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        price: true,
-        originalPrice: true,
-        discount: true,
-        isOnSale: true,
-        isFeatured: true,
-        stock: true,
-        category: true,
-        status: true,
-        images: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      timestamp: new Date().toISOString(),
     });
+  } catch (error: any) {
+    console.error('[Products API] Error:', error);
+    
+    // Detailed error response
+    const errorMessage = process.env.NODE_ENV === 'development'
+      ? `Failed to retrieve products: ${error.message}`
+      : 'Failed to retrieve products';
+      
+    return res.status(500).json({
+      status: 'error',
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
 
-    // Add result log
-    console.log(`Found ${products.length} products`);
-
-    return res.status(200).json(products);
-  } catch (error) {
-    console.error('Error retrieving products:', error);
-    return res.status(500).json({ message: 'Server error' });
+// Helper function to safely parse float values
+function parseFloatSafe(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  
+  try {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? undefined : parsed;
+  } catch (e) {
+    console.warn(`[Products API] Failed to parse value: ${value}`);
+    return undefined;
   }
 } 

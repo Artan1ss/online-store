@@ -19,8 +19,14 @@ class PrismaService {
       this._client = global.prismaInstance;
       console.log('Using existing Prisma instance');
     } else {
+      // Configure Prisma client with proper logging
       this._client = new PrismaClient({
         log: ['query', 'error', 'warn'],
+        datasources: {
+          db: {
+            url: process.env.DATABASE_URL,
+          },
+        }
       });
       
       if (process.env.NODE_ENV !== 'production') {
@@ -29,6 +35,8 @@ class PrismaService {
       }
       
       console.log('Creating new Prisma instance');
+      console.log('Environment:', process.env.NODE_ENV);
+      console.log('Database URL length:', process.env.DATABASE_URL?.length ?? 'undefined');
     }
 
     // Connect to database
@@ -53,6 +61,7 @@ class PrismaService {
     try {
       if (!this._isConnected && this._connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
         this._connectionAttempts++;
+        console.log(`Attempting database connection (${this._connectionAttempts}/${this.MAX_CONNECTION_ATTEMPTS})...`);
         
         // Try a simple query to test the connection
         await this._client.$queryRaw`SELECT 1 as connected`;
@@ -62,15 +71,20 @@ class PrismaService {
         
         console.log('Successfully connected to database');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Database connection failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        meta: error.meta
+      });
       
       // Try to reconnect
       if (this._connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
         console.log(`Attempting to reconnect (${this._connectionAttempts}/${this.MAX_CONNECTION_ATTEMPTS})...`);
         
-        // Retry after a short delay
-        setTimeout(() => this.connect(), 1000 * this._connectionAttempts);
+        // Retry after a short delay with exponential backoff
+        setTimeout(() => this.connect(), 1000 * Math.pow(2, this._connectionAttempts));
       } else {
         console.error('Maximum retry attempts reached, cannot connect to database');
       }
@@ -100,6 +114,14 @@ export async function executePrismaOperation<T>(
     return await operation();
   } catch (error: any) {
     console.error(`Prisma error: ${errorMessage}`, error);
+    
+    // Detailed logging for debugging purposes
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
     
     // Build detailed error message
     let detailedError = errorMessage;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { FiSearch, FiFilter, FiShoppingCart, FiTag, FiStar } from 'react-icons/fi';
+import { FiSearch, FiFilter, FiShoppingCart, FiTag, FiStar, FiAlertCircle } from 'react-icons/fi';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import { useCart } from '@/contexts/CartContext';
@@ -18,6 +18,27 @@ interface Product {
   category: string;
   status: string;
   images: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApiResponse {
+  status: 'success' | 'error';
+  message: string;
+  data?: {
+    products: Product[];
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+    meta: {
+      responseTimeMs: number;
+    };
+  };
+  error?: string;
+  timestamp: string;
 }
 
 export default function ProductsPage() {
@@ -31,6 +52,10 @@ export default function ProductsPage() {
   const [showOnSale, setShowOnSale] = useState(false);
   const [showFeatured, setShowFeatured] = useState(false);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(12);
+  const [hasMore, setHasMore] = useState(false);
   const { addItem } = useCart();
 
   // Get all products
@@ -42,6 +67,14 @@ export default function ProductsPage() {
         
         // Build query parameters
         const params = new URLSearchParams();
+        
+        if (searchTerm) {
+          params.append('search', searchTerm);
+        }
+        
+        if (selectedCategory) {
+          params.append('category', selectedCategory);
+        }
         
         if (showOnSale) {
           params.append('isOnSale', 'true');
@@ -60,22 +93,38 @@ export default function ProductsPage() {
         params.append('minPrice', priceRange[0].toString());
         params.append('maxPrice', priceRange[1].toString());
         
+        // Pagination
+        params.append('offset', (currentPage * pageSize).toString());
+        params.append('limit', pageSize.toString());
+        
+        console.log('Fetching products with params:', params.toString());
+        
         const response = await fetch(`/api/products/public?${params.toString()}`);
         
         if (!response.ok) {
-          throw new Error(`Error fetching products: ${response.status} ${response.statusText}`);
+          const errorText = await response.text();
+          throw new Error(`Error fetching products: ${response.status} ${response.statusText}. ${errorText}`);
         }
         
-        const data = await response.json();
+        const result: ApiResponse = await response.json();
         
-        if (!Array.isArray(data)) {
+        if (result.status === 'error') {
+          throw new Error(result.error || result.message || 'Unknown error occurred');
+        }
+        
+        if (!result.data || !Array.isArray(result.data.products)) {
           throw new Error('Invalid data format received from server');
         }
         
-        setProducts(data);
+        setProducts(result.data.products);
+        setTotalProducts(result.data.pagination.total);
+        setHasMore(result.data.pagination.hasMore);
         
         // Extract all unique categories
-        const uniqueCategories = Array.from(new Set(data.map((product: Product) => product.category).filter(Boolean))) as string[];
+        const uniqueCategories = Array.from(
+          new Set(result.data.products.map(product => product.category).filter(Boolean))
+        ) as string[];
+        
         setCategories(uniqueCategories);
       } catch (error) {
         console.error('Error fetching products:', error);
@@ -87,7 +136,7 @@ export default function ProductsPage() {
     };
 
     fetchProducts();
-  }, [sortMethod, showOnSale, showFeatured, priceRange]);
+  }, [sortMethod, showOnSale, showFeatured, priceRange, searchTerm, selectedCategory, currentPage, pageSize]);
 
   // Get sorting parameters based on method
   const getSortParams = (method: string) => {
@@ -98,20 +147,12 @@ export default function ProductsPage() {
         return { sort: 'price', order: 'asc' };
       case 'price-high':
         return { sort: 'price', order: 'desc' };
-      case 'discount-high':
-        return { sort: 'discount', order: 'desc' };
+      case 'name':
+        return { sort: 'name', order: 'asc' };
       default:
         return { sort: 'createdAt', order: 'desc' };
     }
   };
-
-  // Filter products
-  const filteredProducts = products ? products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (product.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
-    const matchesCategory = !selectedCategory || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  }) : [];
 
   // Add to cart
   const handleAddToCart = (e: React.MouseEvent, product: Product) => {
@@ -131,7 +172,7 @@ export default function ProductsPage() {
       name: product.name,
       price: finalPrice,
       originalPrice: originalPrice,
-      image: product.images[0] || '/placeholder.png'
+      image: product.images?.[0] || '/placeholder.png'
     });
   };
 
@@ -155,6 +196,12 @@ export default function ProductsPage() {
     }
     
     setPriceRange(newRange);
+  };
+  
+  // Handle page change
+  const changePage = (newPage: number) => {
+    window.scrollTo(0, 0);
+    setCurrentPage(newPage);
   };
 
   return (
@@ -228,7 +275,7 @@ export default function ProductsPage() {
                 <option value="newest">Newest</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
-                <option value="discount-high">Max Discount</option>
+                <option value="name">Name (A-Z)</option>
               </select>
             </div>
           </div>
@@ -281,13 +328,35 @@ export default function ProductsPage() {
           {/* Error message */}
           {error && (
             <div className="mt-4 p-4 border border-red-200 bg-red-50 rounded-md">
-              <p className="text-red-700">{error}</p>
-              <button 
-                className="mt-2 text-blue-600 underline"
-                onClick={() => window.location.reload()}
-              >
-                Try again
-              </button>
+              <div className="flex items-start">
+                <FiAlertCircle className="text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                <div>
+                  <h3 className="text-red-700 font-medium">Error loading products</h3>
+                  <p className="text-red-600 text-sm mt-1">{error}</p>
+                  <div className="mt-3 flex space-x-4">
+                    <button 
+                      className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      onClick={() => window.location.reload()}
+                    >
+                      Refresh page
+                    </button>
+                    <button 
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      onClick={() => {
+                        setError(null);
+                        setPriceRange([0, 10000]);
+                        setSelectedCategory('');
+                        setSearchTerm('');
+                        setShowFeatured(false);
+                        setShowOnSale(false);
+                        setSortMethod('newest');
+                      }}
+                    >
+                      Reset filters
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -301,74 +370,124 @@ export default function ProductsPage() {
             <p className="mt-2 text-gray-600">Loading products...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <div className="relative group" key={product.id}>
-                <Link href={`/products/${product.id}`}>
-                  <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full">
-                    <div className="aspect-w-3 aspect-h-2 relative">
-                      <img
-                        src={product.images[0] || '/placeholder.png'}
-                        alt={product.name}
-                        className="w-full h-48 object-cover"
-                      />
-                      {product.isOnSale && product.discount && (
-                        <div className="absolute top-0 left-0 bg-red-500 text-white px-2 py-1 text-xs font-bold">
-                          Sale {product.discount}% off
-                        </div>
-                      )}
-                      {product.isFeatured && (
-                        <div className="absolute top-0 right-0 bg-yellow-500 text-white px-2 py-1 text-xs font-bold">
-                          Recommended
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">{product.name}</h3>
-                      <p className="text-sm text-gray-500 mb-2 line-clamp-2">{product.description}</p>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          {product.isOnSale && product.discount ? (
-                            <>
-                              <span className="text-lg font-bold text-red-600">
-                                ${(product.price * (1 - product.discount / 100)).toFixed(2)}
-                              </span>
-                              <span className="ml-2 text-sm text-gray-500 line-through">
-                                ${product.price.toFixed(2)}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-lg font-bold text-gray-900">${product.price.toFixed(2)}</span>
-                          )}
-                        </div>
-                        <span className="text-sm text-gray-500">{product.stock} in stock</span>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {products && products.length > 0 ? products.map((product) => (
+                <div className="relative group" key={product.id}>
+                  <Link href={`/products/${product.id}`}>
+                    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full">
+                      <div className="aspect-w-3 aspect-h-2 relative">
+                        <img
+                          src={product.images?.[0] || '/placeholder.png'}
+                          alt={product.name}
+                          className="w-full h-48 object-cover"
+                          onError={(e) => {
+                            // Fallback for image loading errors
+                            (e.target as HTMLImageElement).src = '/placeholder.png';
+                          }}
+                        />
+                        {product.isOnSale && product.discount && (
+                          <div className="absolute top-0 left-0 bg-red-500 text-white px-2 py-1 text-xs font-bold">
+                            Sale {product.discount}% off
+                          </div>
+                        )}
+                        {product.isFeatured && (
+                          <div className="absolute top-0 right-0 bg-yellow-500 text-white px-2 py-1 text-xs font-bold">
+                            Recommended
+                          </div>
+                        )}
                       </div>
-                      {product.isOnSale && product.discount && (
-                        <div className="mt-2 text-sm font-medium text-green-500">
-                          Save: ${(product.price * product.discount / 100).toFixed(2)}
+                      <div className="p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{product.name}</h3>
+                        <p className="text-sm text-gray-500 mb-2 line-clamp-2">{product.description}</p>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            {product.isOnSale && product.discount ? (
+                              <>
+                                <span className="text-lg font-bold text-red-600">
+                                  ${(product.price * (1 - product.discount / 100)).toFixed(2)}
+                                </span>
+                                <span className="ml-2 text-sm text-gray-500 line-through">
+                                  ${product.price.toFixed(2)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-lg font-bold text-gray-900">${product.price.toFixed(2)}</span>
+                            )}
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {product.stock > 0 
+                              ? `${product.stock} in stock` 
+                              : 'Out of stock'}
+                          </span>
                         </div>
-                      )}
+                        {product.isOnSale && product.discount && (
+                          <div className="mt-2 text-sm font-medium text-green-500">
+                            Save: ${(product.price * product.discount / 100).toFixed(2)}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Link>
-                {product.stock > 0 && (
-                  <button
-                    onClick={(e) => handleAddToCart(e, product)}
-                    className="absolute bottom-4 right-4 bg-blue-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    aria-label="Add to cart"
+                  </Link>
+                  {(product.stock > 0) && (
+                    <button
+                      onClick={(e) => handleAddToCart(e, product)}
+                      className="absolute bottom-4 right-4 bg-blue-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      aria-label="Add to cart"
+                    >
+                      <FiShoppingCart size={18} />
+                    </button>
+                  )}
+                </div>
+              )) : (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-500">No products found.</p>
+                  <button 
+                    className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    onClick={() => {
+                      setPriceRange([0, 10000]);
+                      setSelectedCategory('');
+                      setSearchTerm('');
+                      setShowFeatured(false);
+                      setShowOnSale(false);
+                      setSortMethod('newest');
+                    }}
                   >
-                    <FiShoppingCart size={18} />
+                    Reset all filters
                   </button>
-                )}
+                </div>
+              )}
+            </div>
+            
+            {/* Pagination */}
+            {products && products.length > 0 && (
+              <div className="mt-8 flex justify-between items-center">
+                <div className="text-sm text-gray-500">
+                  Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalProducts)} of {totalProducts} products
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => changePage(Math.max(0, currentPage - 1))}
+                    disabled={currentPage === 0}
+                    className={`px-3 py-1 rounded border ${
+                      currentPage === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => changePage(currentPage + 1)}
+                    disabled={!hasMore}
+                    className={`px-3 py-1 rounded border ${
+                      !hasMore ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No products found.</p>
-          </div>
+            )}
+          </>
         )}
       </div>
     </Layout>
