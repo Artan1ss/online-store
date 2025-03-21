@@ -1,28 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { FiShoppingCart, FiArrowLeft, FiTag } from 'react-icons/fi';
+import { FiShoppingCart, FiArrowLeft, FiTag, FiAlertCircle } from 'react-icons/fi';
 import Layout from '@/components/Layout';
 import { useCart } from '@/contexts/CartContext';
 
 interface Product {
   id: string;
   name: string;
-  description: string;
+  description?: string | null;
   price: number;
   originalPrice?: number | null;
   discount?: number | null;
-  isOnSale: boolean;
-  isFeatured: boolean;
-  stock: number;
+  isOnSale?: boolean;
+  isFeatured?: boolean;
+  stock?: number;
+  inventory?: number;
   category: string;
-  status: string;
-  images: string[];
+  status?: string;
+  images?: string[];
+  imageUrl?: string;
+}
+
+interface ApiResponse {
+  status: 'success' | 'error';
+  message: string;
+  data?: {
+    products: Product[];
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+    meta: {
+      responseTimeMs: number;
+      fallback?: boolean;
+    };
+  };
+  error?: string;
+  timestamp: string;
 }
 
 export default function DealsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortMethod, setSortMethod] = useState('discount-high');
   const { addItem } = useCart();
 
@@ -30,6 +53,7 @@ export default function DealsPage() {
     const fetchDeals = async () => {
       try {
         setLoading(true);
+        setError(null);
         
         // Build query parameters
         const params = new URLSearchParams();
@@ -41,10 +65,29 @@ export default function DealsPage() {
         params.append('order', sortParams.order);
         
         const response = await fetch(`/api/products/public?${params.toString()}`);
-        const data = await response.json();
-        setProducts(data);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Error fetching sale products: ${response.status} ${response.statusText}. ${errorText}`);
+        }
+        
+        const result: ApiResponse = await response.json();
+        
+        if (result.status === 'error') {
+          throw new Error(result.error || result.message || 'Unknown error occurred');
+        }
+        
+        // Check if the response has the expected format
+        if (!result.data || !Array.isArray(result.data.products)) {
+          console.log('Unexpected API response format:', result);
+          setProducts([]);
+        } else {
+          setProducts(result.data.products);
+        }
       } catch (error) {
         console.error('Error fetching sale products:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load sale products');
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -87,7 +130,7 @@ export default function DealsPage() {
       name: product.name,
       price: finalPrice,
       originalPrice: originalPrice,
-      image: product.images[0] || '/placeholder.png'
+      image: product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/placeholder.png')
     });
   };
 
@@ -141,24 +184,52 @@ export default function DealsPage() {
               </select>
             </div>
           </div>
+          
+          {/* Error message */}
+          {error && (
+            <div className="mt-4 p-4 border border-red-200 bg-red-50 rounded-md">
+              <div className="flex items-start">
+                <FiAlertCircle className="text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                <div>
+                  <h3 className="text-red-700 font-medium">Error loading sale items</h3>
+                  <p className="text-red-600 text-sm mt-1">{error}</p>
+                  <div className="mt-3 flex space-x-4">
+                    <button 
+                      className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      onClick={() => window.location.reload()}
+                    >
+                      Refresh page
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Product List */}
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+              <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
+            </div>
+            <p className="mt-2 text-gray-600">Loading sale items...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
+            {products && products.length > 0 ? products.map((product) => (
               <div className="relative group" key={product.id}>
                 <Link href={`/products/${product.id}`}>
                   <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full">
                     <div className="aspect-w-3 aspect-h-2 relative">
                       <img
-                        src={product.images[0] || '/placeholder.png'}
+                        src={product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/placeholder.png')}
                         alt={product.name}
                         className="w-full h-48 object-cover"
+                        onError={(e) => {
+                          // Fallback for image loading errors
+                          (e.target as HTMLImageElement).src = '/placeholder.png';
+                        }}
                       />
                       {product.discount && (
                         <div className="absolute top-0 left-0 bg-red-500 text-white px-2 py-1 text-xs font-bold">
@@ -189,7 +260,11 @@ export default function DealsPage() {
                             <span className="text-lg font-bold text-gray-900">${product.price.toFixed(2)}</span>
                           )}
                         </div>
-                        <span className="text-sm text-gray-500">{product.stock} in stock</span>
+                        <span className="text-sm text-gray-500">
+                          {(product.stock ?? product.inventory ?? 0) > 0 
+                            ? `${product.stock ?? product.inventory} in stock` 
+                            : 'Out of stock'}
+                        </span>
                       </div>
                       {product.originalPrice && (
                         <div className="mt-2 text-sm font-medium text-green-500">
@@ -199,7 +274,7 @@ export default function DealsPage() {
                     </div>
                   </div>
                 </Link>
-                {product.stock > 0 && (
+                {(product.stock ?? product.inventory ?? 0) > 0 && (
                   <button
                     onClick={(e) => handleAddToCart(e, product)}
                     className="absolute bottom-4 right-4 bg-blue-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -209,11 +284,11 @@ export default function DealsPage() {
                   </button>
                 )}
               </div>
-            ))}
+            )) : null}
           </div>
         )}
 
-        {!loading && products.length === 0 && (
+        {!loading && (!products || products.length === 0) && (
           <div className="text-center py-12">
             <p className="text-gray-500">No sale items available at the moment.</p>
             <Link href="/products" className="mt-4 inline-block text-blue-500 hover:text-blue-700">
