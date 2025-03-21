@@ -37,8 +37,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
   
+  // Define the result type to include all properties we'll use
+  type TestResults = {
+    connection: boolean;
+    queries: {
+      raw: boolean;
+      product: boolean;
+      user: boolean;
+    };
+    errors: string[];
+    dbInfo: DbUrlInfo;
+    db_info?: any;
+    product_count?: number;
+    user_count?: number;
+    pool_info?: any;
+    timestamp: string;
+  };
+
   // Test results
-  const testResults = {
+  const testResults: TestResults = {
     connection: false,
     queries: {
       raw: false,
