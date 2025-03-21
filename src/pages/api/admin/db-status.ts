@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 
 // Define the type for the database status response
-type DbStatusResponse = {
+interface DbStatusRow {
   time: Date;
 }
 
@@ -19,8 +19,8 @@ export default async function handler(
   }
 
   try {
-    // Database connection check
-    const dbStatus = await prisma.$queryRaw<DbStatusResponse[]>`SELECT current_timestamp as time`;
+    // Database connection check with explicit type casting
+    const dbStatus = await prisma.$queryRaw`SELECT current_timestamp as time` as DbStatusRow[];
     
     // Get table metrics
     const metrics = await Promise.all([
@@ -74,11 +74,11 @@ export default async function handler(
       recentOrders,
       lowStockProducts
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Database status check failed:', error);
     return res.status(500).json({ 
       status: 'error',
-      error: error.message 
+      error: error.message || 'Unknown error' 
     });
   }
 } 
