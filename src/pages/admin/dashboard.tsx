@@ -104,8 +104,8 @@ export default function AdminDashboard() {
         }
         const data = await res.json();
         setDbStats(data);
-      } catch (err) {
-        setError(err.message);
+      } catch (err: any) {
+        setError(err.message || 'An error occurred while fetching database status');
       } finally {
         setLoading(false);
       }
