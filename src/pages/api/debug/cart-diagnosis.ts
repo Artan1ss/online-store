@@ -57,7 +57,13 @@ export default async function handler(
     });
 
     // Handle any cart items passed in the request body
-    let cartDiagnosis = null;
+    let cartDiagnosis: {
+      totalCartItems: number;
+      validItems: number;
+      invalidItems: number;
+      invalidItemDetails: CartItem[];
+      recommendation: string;
+    } | null = null;
     if (req.method === 'POST' && req.body.items) {
       const cartItems: CartItem[] = req.body.items;
       

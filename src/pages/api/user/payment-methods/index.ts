@@ -100,7 +100,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const shouldBeDefault = isDefault || paymentMethodCount === 0;
 
         // For credit cards, only store the last four digits
-        let maskedCardNumber = null;
+        let maskedCardNumber: string | null = null;
         if (type === 'CREDIT_CARD' && cardNumber) {
           maskedCardNumber = cardNumber.slice(-4).padStart(cardNumber.length, '*');
         }

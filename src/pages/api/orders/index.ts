@@ -74,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const orderNumber = `ORD-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}`;
 
       // Get current logged-in user ID (if logged in)
-      let userId = null;
+      let userId: string | null = null;
       if (session?.user?.id) {
         userId = session.user.id;
         

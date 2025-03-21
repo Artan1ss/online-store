@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // If specific product IDs are provided, check them
-    let specificProducts = null;
+    let specificProducts: any = null;
     if (productIds) {
       const ids = Array.isArray(productIds) 
         ? productIds 
