@@ -79,13 +79,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         () => prisma.address.update({
           where: { id: addressId },
           data: {
-            name: name || address.name,
-            street: street || address.street,
+            fullName: name || address.fullName,
+            address: street || address.address,
             city: city || address.city,
-            state: state || address.state,
-            postalCode: postalCode || address.postalCode,
             country: country || address.country,
-            phoneNumber: phoneNumber || address.phoneNumber,
+            postalCode: postalCode || address.postalCode,
+            phone: phoneNumber || address.phone,
             isDefault: isDefault !== undefined ? isDefault : address.isDefault
           }
         }),
