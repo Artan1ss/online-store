@@ -84,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           try {
             // Check if this is the first address (if so, set as default)
             const addressCount = await executePrismaOperation(
-              () => prisma.address.count({ where: { userId } }),
+              () => prisma.address.count({ where: { userId: userId } }),
               'Failed to count user addresses'
             );
             
@@ -115,7 +115,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           try {
             // Check if this is the first payment method (if so, set as default)
             const paymentCount = await executePrismaOperation(
-              () => prisma.paymentMethod.count({ where: { userId } }),
+              () => prisma.paymentMethod.count({ where: { userId: userId } }),
               'Failed to count payment methods'
             );
             
