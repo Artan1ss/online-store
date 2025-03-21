@@ -43,7 +43,8 @@ export default async function handler(
     const limit = parseInt(req.query.limit as string || '50');
     const offset = parseInt(req.query.offset as string || '0');
     
-    // Build query conditions
+    // Build query conditions - ensure we use 'status' (which exists in schema) 
+    // instead of 'isPublished' (which doesn't)
     const where: any = { status: 'active' };
     
     if (search) {
@@ -81,7 +82,7 @@ export default async function handler(
 
     // Safely determine fields to select, using a fallback approach to handle potential schema differences
     // between environments
-    let selectFields = null;
+    let selectFields: Record<string, boolean> | null = null;
     try {
       // First try with all fields we expect to be in the schema
       selectFields = {
