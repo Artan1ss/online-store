@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "deploy:db": "node scripts/deploy-db.js",
+    "test:db-connection": "node scripts/test-db-connection.js",
+    "db:health-check": "node scripts/db-health-check.js"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
@@ -30,6 +34,7 @@
     "@types/react-dom": "^18.0.0",
     "autoprefixer": "^10.4.0",
     "bcryptjs": "^3.0.2",
+    "dotenv": "^16.4.7",
     "postcss": "^8.4.0",
     "prisma": "^6.5.0",
     "tailwindcss": "^3.3.0",

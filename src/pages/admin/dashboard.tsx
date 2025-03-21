@@ -3,6 +3,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { FiBox, FiUsers, FiShoppingBag, FiPackage, FiDollarSign, FiEye, FiEdit } from 'react-icons/fi';
 import AdminLayout from '@/components/AdminLayout';
+import { GetServerSideProps } from 'next';
+import { useSession, getSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 
 // Order status type
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
@@ -18,7 +21,23 @@ interface Order {
   createdAt: string;
 }
 
+interface DbStats {
+  status: string;
+  timestamp: string;
+  metrics: {
+    users: number;
+    products: number;
+    orders: number;
+    orderItems: number;
+    addresses: number;
+    paymentMethods: number;
+  };
+  recentOrders: any[];
+  lowStockProducts: any[];
+}
+
 export default function AdminDashboard() {
+  const { data: session, status } = useSession();
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -28,8 +47,16 @@ export default function AdminDashboard() {
     totalUsers: 0
   });
   const [loading, setLoading] = useState(true);
+  const [dbStats, setDbStats] = useState<DbStats | null>(null);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
-  // Fetch orders and stats
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -62,8 +89,32 @@ export default function AdminDashboard() {
       }
     };
 
-    fetchData();
-  }, []);
+    if (session) {
+      fetchData();
+    }
+  }, [session]);
+
+  useEffect(() => {
+    const fetchDbStats = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/admin/db-status');
+        if (!res.ok) {
+          throw new Error('Failed to fetch database status');
+        }
+        const data = await res.json();
+        setDbStats(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (session) {
+      fetchDbStats();
+    }
+  }, [session]);
 
   // Get status badge class
   const getStatusBadgeClass = (status: OrderStatus) => {
@@ -82,6 +133,22 @@ export default function AdminDashboard() {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (status === 'loading') {
+    return <div className="p-8 text-center">Loading...</div>;
+  }
+
+  if (!session || session.user.role !== 'ADMIN') {
+    return (
+      <div className="p-8 text-center">
+        <h1 className="text-xl font-bold mb-4">Access Denied</h1>
+        <p>You need to be an admin to view this page.</p>
+        <Link href="/" className="text-blue-500 hover:underline mt-4 inline-block">
+          Return to Home
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -259,7 +326,185 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Database Status */}
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Database Status</h2>
+          {loading ? (
+            <div className="text-center p-8">Loading database stats...</div>
+          ) : error ? (
+            <div className="bg-red-50 p-4 rounded-md border border-red-200 text-red-700">
+              {error}
+            </div>
+          ) : dbStats ? (
+            <div>
+              <div className="mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-white shadow rounded-lg p-4">
+                    <div className="text-sm font-medium text-gray-500">Status</div>
+                    <div className="mt-1 flex items-center">
+                      <span className={`inline-block w-3 h-3 rounded-full mr-2 ${dbStats.status === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      <span className="text-xl font-semibold">{dbStats.status}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white shadow rounded-lg p-4">
+                    <div className="text-sm font-medium text-gray-500">Last Updated</div>
+                    <div className="mt-1 text-xl font-semibold">
+                      {new Date(dbStats.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <MetricCard label="Users" value={dbStats.metrics.users} />
+                <MetricCard label="Products" value={dbStats.metrics.products} />
+                <MetricCard label="Orders" value={dbStats.metrics.orders} />
+                <MetricCard label="Order Items" value={dbStats.metrics.orderItems} />
+                <MetricCard label="Addresses" value={dbStats.metrics.addresses} />
+                <MetricCard label="Payment Methods" value={dbStats.metrics.paymentMethods} />
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Recent Orders</h2>
+                  {dbStats.recentOrders.length === 0 ? (
+                    <p className="text-gray-500">No orders found</p>
+                  ) : (
+                    <div className="bg-white shadow rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Order #
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Customer
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Amount
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Date
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {dbStats.recentOrders.map((order) => (
+                            <tr key={order.id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {order.orderNumber}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {order.customerName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${order.totalAmount.toFixed(2)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  order.status === 'DELIVERED' ? 'bg-green-100 text-green-800' :
+                                  order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' :
+                                  order.status === 'PROCESSING' ? 'bg-yellow-100 text-yellow-800' :
+                                  order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(order.createdAt).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Low Stock Products</h2>
+                  {dbStats.lowStockProducts.length === 0 ? (
+                    <p className="text-gray-500">No low stock products</p>
+                  ) : (
+                    <div className="bg-white shadow rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Product
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Stock
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Action
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {dbStats.lowStockProducts.map((product) => (
+                            <tr key={product.id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {product.name}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  product.stock === 0 ? 'bg-red-100 text-red-800' :
+                                  product.stock < 5 ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-green-100 text-green-800'
+                                }`}>
+                                  {product.stock}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <Link href={`/admin/products/edit/${product.id}`} className="text-indigo-600 hover:text-indigo-900">
+                                  Update Stock
+                                </Link>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </AdminLayout>
   );
-} 
+}
+
+function MetricCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="bg-white shadow rounded-lg p-4">
+      <div className="text-sm font-medium text-gray-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const session = await getSession(context);
+  
+  if (!session || session.user.role !== 'ADMIN') {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+  
+  return {
+    props: {},
+  };
+}; 

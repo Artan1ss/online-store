@@ -39,7 +39,7 @@ export default async function handler(
     // Get recent order items
     const recentOrderItems = await prisma.orderItem.findMany({
       take: 10,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { orderId: 'desc' },
       include: {
         product: {
           select: { id: true, name: true }
