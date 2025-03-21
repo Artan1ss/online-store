@@ -84,7 +84,7 @@ export default async function handler(
       status: 'success',
       databaseStats: {
         productCount,
-        validProductIds: validProductIds.map(p => p.id),
+        validProductIds: validProductIds.map((p: { id: string }) => p.id),
       },
       recentOrders,
       recentOrderItems,

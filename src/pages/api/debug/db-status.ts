@@ -84,7 +84,7 @@ export default async function handler(
         take: 100 // Limit to prevent overload
       });
       
-      const productIds = [...new Set(allOrderItems.map(item => item.productId))];
+      const productIds = [...new Set(allOrderItems.map((item: { productId: string }) => item.productId))];
       const existingProducts = await prisma.product.findMany({
         where: {
           id: {
@@ -96,10 +96,10 @@ export default async function handler(
         }
       });
       
-      const existingProductIds = new Set(existingProducts.map(p => p.id));
+      const existingProductIds = new Set(existingProducts.map((p: { id: string }) => p.id));
       invalidOrderItems = allOrderItems
-        .filter(item => !existingProductIds.has(item.productId))
-        .map(item => ({
+        .filter((item: { productId: string }) => !existingProductIds.has(item.productId))
+        .map((item: { id: string; productId: string; orderId: string }) => ({
           id: item.id,
           productId: item.productId,
           orderId: item.orderId

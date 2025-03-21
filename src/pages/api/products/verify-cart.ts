@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Extract product IDs from cart items
-    const cartProductIds = items.map(item => item.id);
+    const cartProductIds = items.map((item: { id: string }) => item.id);
     
     // Fetch actual products from the database
     const existingProducts = await prisma.product.findMany({
@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Create lookup map for faster checking
     const productMap = new Map();
-    existingProducts.forEach(product => {
+    existingProducts.forEach((product: { id: string }) => {
       productMap.set(product.id, product);
     });
 

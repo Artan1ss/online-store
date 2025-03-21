@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : files.images 
         ? [files.images] 
         : [];
-    const fileUrls = uploadedFiles.map(file => `/uploads/${path.basename(file.filepath)}`);
+    const fileUrls = uploadedFiles.map((file: formidable.File) => `/uploads/${path.basename(file.filepath)}`);
 
     return res.status(200).json({ urls: fileUrls });
   } catch (error) {

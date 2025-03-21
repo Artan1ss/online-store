@@ -51,13 +51,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         // Create lookup for quick access
-        const productLookup = existingProducts.reduce((lookup: any, product) => {
+        const productLookup = existingProducts.reduce((lookup: any, product: { id: string }) => {
           lookup[product.id] = product;
           return lookup;
         }, {});
 
         // Check if any products are missing
-        const missingProducts = productIds.filter(id => !productLookup[id]);
+        const missingProducts = productIds.filter((id: string) => !productLookup[id]);
         if (missingProducts.length > 0) {
           console.error('Missing products:', missingProducts);
           return res.status(400).json({ 
