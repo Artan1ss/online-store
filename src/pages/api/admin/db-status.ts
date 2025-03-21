@@ -3,6 +3,11 @@ import prisma from '@/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 
+// Define the type for the database status response
+type DbStatusResponse = {
+  time: Date;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -15,7 +20,7 @@ export default async function handler(
 
   try {
     // Database connection check
-    const dbStatus = await prisma.$queryRaw`SELECT current_timestamp as time`;
+    const dbStatus = await prisma.$queryRaw<DbStatusResponse[]>`SELECT current_timestamp as time`;
     
     // Get table metrics
     const metrics = await Promise.all([
