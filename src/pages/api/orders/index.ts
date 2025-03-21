@@ -82,16 +82,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (saveAddress && addressData && userId) {
           console.log('Saving new address for user:', userId);
           try {
+            // Ensure userId is a string for TypeScript (we already checked it's not null above)
+            const userIdString: string = userId;
+            
             // Check if this is the first address (if so, set as default)
             const addressCount = await executePrismaOperation(
-              () => prisma.address.count({ where: { userId: userId } }),
+              () => prisma.address.count({ where: { userId: userIdString } }),
               'Failed to count user addresses'
             );
             
             await executePrismaOperation(
               () => prisma.address.create({
                 data: {
-                  userId,
+                  userId: userIdString,
                   fullName: addressData.fullName,
                   phone: addressData.phone,
                   address: addressData.address,
@@ -113,16 +116,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (savePaymentMethod && paymentData && userId) {
           console.log('Saving new payment method for user:', userId);
           try {
+            // Ensure userId is a string for TypeScript (we already checked it's not null above)
+            const userIdString: string = userId;
+            
             // Check if this is the first payment method (if so, set as default)
             const paymentCount = await executePrismaOperation(
-              () => prisma.paymentMethod.count({ where: { userId: userId } }),
+              () => prisma.paymentMethod.count({ where: { userId: userIdString } }),
               'Failed to count payment methods'
             );
             
             await executePrismaOperation(
               () => prisma.paymentMethod.create({
                 data: {
-                  userId,
+                  userId: userIdString,
                   type: paymentData.type,
                   cardNumber: paymentData.cardNumber,
                   cardExpiry: paymentData.cardExpiry,
