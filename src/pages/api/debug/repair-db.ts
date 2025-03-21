@@ -13,7 +13,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const operations = [];
-    const results = {
+    const results: {
+      orderItems: number;
+      orders: number;
+      messages: string[];
+    } = {
       orderItems: 0,
       orders: 0,
       messages: []
