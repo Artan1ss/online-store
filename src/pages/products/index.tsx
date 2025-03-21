@@ -8,18 +8,21 @@ import { useCart } from '@/contexts/CartContext';
 interface Product {
   id: string;
   name: string;
-  description: string;
+  description?: string | null;
   price: number;
   originalPrice?: number | null;
   discount?: number | null;
-  isOnSale: boolean;
-  isFeatured: boolean;
-  stock: number;
+  isOnSale?: boolean;
+  isFeatured?: boolean;
+  stock?: number;
+  status?: string;
   category: string;
-  status: string;
-  images: string[];
-  createdAt: string;
-  updatedAt: string;
+  images?: string[];
+  imageUrl?: string; // Fallback for different API responses
+  inventory?: number; // Fallback for different API responses
+  isPublished?: boolean; // Fallback for different API responses
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface ApiResponse {
@@ -172,7 +175,7 @@ export default function ProductsPage() {
       name: product.name,
       price: finalPrice,
       originalPrice: originalPrice,
-      image: product.images?.[0] || '/placeholder.png'
+      image: product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/placeholder.png')
     });
   };
 
@@ -378,7 +381,7 @@ export default function ProductsPage() {
                     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full">
                       <div className="aspect-w-3 aspect-h-2 relative">
                         <img
-                          src={product.images?.[0] || '/placeholder.png'}
+                          src={product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/placeholder.png')}
                           alt={product.name}
                           className="w-full h-48 object-cover"
                           onError={(e) => {
@@ -416,8 +419,8 @@ export default function ProductsPage() {
                             )}
                           </div>
                           <span className="text-sm text-gray-500">
-                            {product.stock > 0 
-                              ? `${product.stock} in stock` 
+                            {(product.stock ?? product.inventory ?? 0) > 0 
+                              ? `${product.stock ?? product.inventory ?? 0} in stock` 
                               : 'Out of stock'}
                           </span>
                         </div>
@@ -429,7 +432,7 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   </Link>
-                  {(product.stock > 0) && (
+                  {(product.stock ?? product.inventory ?? 0) > 0 && (
                     <button
                       onClick={(e) => handleAddToCart(e, product)}
                       className="absolute bottom-4 right-4 bg-blue-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"

@@ -78,68 +78,130 @@ export default async function handler(
     }
     
     console.log('[Products API] Query conditions:', JSON.stringify(where));
-    
-    // Execute the database query with enhanced error handling
-    const products = await executePrismaOperation(async () => {
-      console.log('[Products API] Executing Prisma query...');
+
+    // Safely determine fields to select, using a fallback approach to handle potential schema differences
+    // between environments
+    let selectFields = null;
+    try {
+      // First try with all fields we expect to be in the schema
+      selectFields = {
+        id: true,
+        name: true,
+        description: true,
+        price: true,
+        originalPrice: true,
+        discount: true,
+        isOnSale: true,
+        isFeatured: true,
+        stock: true,
+        category: true,
+        status: true,
+        images: true,
+        createdAt: true,
+        updatedAt: true,
+      };
       
-      return prisma.product.findMany({
-        where,
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          price: true,
-          originalPrice: true,
-          discount: true,
-          isOnSale: true,
-          isFeatured: true,
-          stock: true,
-          category: true,
-          status: true,
-          images: true,
-          createdAt: true,
-          updatedAt: true,
+      // Execute the database query with enhanced error handling
+      const products = await executePrismaOperation(async () => {
+        console.log('[Products API] Executing Prisma query...');
+        
+        return prisma.product.findMany({
+          where,
+          select: selectFields,
+          orderBy: {
+            [sort]: order,
+          },
+          skip: offset,
+          take: limit,
+        });
+      }, 'Failed to fetch products');
+      
+      console.log(`[Products API] Found ${products.length} products`);
+      
+      // Get total count for pagination
+      const total = await executePrismaOperation(
+        () => prisma.product.count({ where }),
+        'Failed to count products'
+      );
+      
+      console.log(`[Products API] Total product count: ${total}`);
+      
+      // Success response
+      const responseTime = new Date().getTime() - startTime.getTime();
+      console.log(`[Products API] Request completed in ${responseTime}ms`);
+      
+      return res.status(200).json({
+        status: 'success',
+        message: 'Products retrieved successfully',
+        data: {
+          products,
+          pagination: {
+            total,
+            limit,
+            offset,
+            hasMore: offset + products.length < total,
+          },
+          meta: {
+            responseTimeMs: responseTime,
+          }
         },
-        orderBy: {
-          [sort]: order,
-        },
-        skip: offset,
-        take: limit,
+        timestamp: new Date().toISOString(),
       });
-    }, 'Failed to fetch products');
-    
-    console.log(`[Products API] Found ${products.length} products`);
-    
-    // Get total count for pagination
-    const total = await executePrismaOperation(
-      () => prisma.product.count({ where }),
-      'Failed to count products'
-    );
-    
-    console.log(`[Products API] Total product count: ${total}`);
-    
-    // Success response
-    const responseTime = new Date().getTime() - startTime.getTime();
-    console.log(`[Products API] Request completed in ${responseTime}ms`);
-    
-    return res.status(200).json({
-      status: 'success',
-      message: 'Products retrieved successfully',
-      data: {
-        products,
-        pagination: {
-          total,
-          limit,
-          offset,
-          hasMore: offset + products.length < total,
-        },
-        meta: {
-          responseTimeMs: responseTime,
+    } catch (error: any) {
+      console.error('[Products API] Error with full select fields:', error);
+      
+      // If there was an error, try with minimal fields that must exist
+      if (error.message.includes('Unknown argument')) {
+        console.log('[Products API] Falling back to minimal field selection');
+        
+        try {
+          // Use only the minimal set of fields guaranteed to exist
+          const products = await prisma.product.findMany({
+            where,
+            orderBy: {
+              [sort]: order,
+            },
+            skip: offset,
+            take: limit,
+          });
+          
+          console.log(`[Products API] Found ${products.length} products with fallback query`);
+          
+          // Get total count for pagination
+          const total = await prisma.product.count({ where });
+          
+          // Success response
+          const responseTime = new Date().getTime() - startTime.getTime();
+          console.log(`[Products API] Request completed with fallback in ${responseTime}ms`);
+          
+          return res.status(200).json({
+            status: 'success',
+            message: 'Products retrieved successfully (with fallback)',
+            data: {
+              products,
+              pagination: {
+                total,
+                limit,
+                offset,
+                hasMore: offset + products.length < total,
+              },
+              meta: {
+                responseTimeMs: responseTime,
+                fallback: true,
+              }
+            },
+            timestamp: new Date().toISOString(),
+          });
+        } catch (fallbackError: any) {
+          // Even the fallback failed, rethrow with more context
+          console.error('[Products API] Fallback query also failed:', fallbackError);
+          throw new Error(`Fallback query failed: ${fallbackError.message}`);
         }
-      },
-      timestamp: new Date().toISOString(),
-    });
+      } else {
+        // If it wasn't a field selection error, rethrow the original error
+        throw error;
+      }
+    }
   } catch (error: any) {
     console.error('[Products API] Error:', error);
     
