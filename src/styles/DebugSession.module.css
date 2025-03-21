@@ -1,0 +1,142 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: #333;
+  text-align: center;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.75rem;
+}
+
+.codeBlock {
+  background-color: #f7f7f7;
+  padding: 1rem;
+  border-radius: 6px;
+  font-family: monospace;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.statusBadge[data-status="authenticated"],
+.statusBadge[data-status="connected"] {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.statusBadge[data-status="unauthenticated"],
+.statusBadge[data-status="disconnected"] {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.statusBadge[data-status="loading"] {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  font-weight: 500;
+  color: #555;
+}
+
+.loading::after {
+  content: "";
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: 0.75rem;
+  border: 2px solid #ccc;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  background-color: #fee2e2;
+  border-left: 4px solid #ef4444;
+  padding: 1rem;
+  border-radius: 4px;
+  color: #b91c1c;
+}
+
+.error h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #b91c1c;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.error p {
+  margin: 0.5rem 0;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 1rem 0.5rem;
+  }
+  
+  .title {
+    font-size: 1.75rem;
+  }
+  
+  .section {
+    padding: 1rem;
+  }
+  
+  .section h2 {
+    font-size: 1.25rem;
+  }
+  
+  .codeBlock {
+    font-size: 0.8rem;
+  }
+} 

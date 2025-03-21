@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Management</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #f9f9f9;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: #0069d9;
+    }
+    button.danger {
+      background-color: #dc3545;
+    }
+    button.danger:hover {
+      background-color: #c82333;
+    }
+    button.success {
+      background-color: #28a745;
+    }
+    button.success:hover {
+      background-color: #218838;
+    }
+    button.warning {
+      background-color: #ffc107;
+      color: #212529;
+    }
+    button.warning:hover {
+      background-color: #e0a800;
+    }
+    .output {
+      background-color: #f0f0f0;
+      border-radius: 4px;
+      padding: 15px;
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-size: 1.2rem;
+      color: #444;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Database Management</h1>
+    
+    <div class="section">
+      <h2>Database Operations</h2>
+      <div class="buttons">
+        <button onclick="checkDatabaseConnection()">Check Database Connection</button>
+        <button onclick="checkProducts()">Check Products</button>
+        <button onclick="checkDatabaseStatus()">Detailed DB Status</button>
+        <button class="warning" onclick="repairDatabase()">Repair Database</button>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Product Management</h2>
+      <div class="buttons">
+        <button class="success" onclick="seedProducts(false)">Seed Products</button>
+        <button class="danger" onclick="clearAndSeedProducts()">Clear &amp; Seed Products</button>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Cart Management</h2>
+      <div class="buttons">
+        <button onclick="verifyCart()">Verify Cart</button>
+        <button onclick="checkCart()">View Cart</button>
+        <button onclick="diagnoseCart()">Diagnose Cart</button>
+        <button class="danger" onclick="clearCart()">Clear Cart</button>
+      </div>
+    </div>
+    
+    <div class="output">
+      <pre id="output">Output will appear here...</pre>
+    </div>
+  </div>
+
+  <script>
+    const output = document.getElementById('output');
+    
+    function setOutput(text, isError = false) {
+      output.innerText = text;
+      output.style.color = isError ? 'red' : 'inherit';
+    }
+    
+    async function checkDatabaseConnection() {
+      try {
+        setOutput('Checking database connection...');
+        const response = await fetch('/api/db-test');
+        const data = await response.json();
+        setOutput(JSON.stringify(data, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+    
+    async function checkDatabaseStatus() {
+      try {
+        setOutput('Retrieving detailed database status...');
+        const response = await fetch('/api/debug/db-status');
+        const data = await response.json();
+        setOutput(JSON.stringify(data, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+    
+    async function checkProducts() {
+      try {
+        setOutput('Checking products...');
+        const response = await fetch('/api/db-test');
+        const data = await response.json();
+        setOutput(JSON.stringify(data.sampleProducts, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+    
+    async function seedProducts(clearExisting = false) {
+      try {
+        const url = clearExisting ? '/api/seed-products?clear=true' : '/api/seed-products';
+        setOutput(`${clearExisting ? 'Clearing and seeding' : 'Seeding'} products...`);
+        const response = await fetch(url, { method: 'POST' });
+        const data = await response.json();
+        setOutput(JSON.stringify(data, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+    
+    async function clearAndSeedProducts() {
+      if (confirm('This will delete ALL existing products and orders. Are you sure?')) {
+        await seedProducts(true);
+      }
+    }
+    
+    async function repairDatabase() {
+      try {
+        setOutput('Repairing database...');
+        const response = await fetch('/api/debug/repair-db', { method: 'POST' });
+        const data = await response.json();
+        setOutput(JSON.stringify(data, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+    
+    async function diagnoseCart() {
+      try {
+        setOutput('Diagnosing cart and database state...');
+        const cartItems = getCartFromLocalStorage();
+        
+        const response = await fetch('/api/debug/cart-diagnosis', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ items: cartItems }),
+        });
+        
+        const data = await response.json();
+        setOutput(JSON.stringify(data, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+    
+    function getCartFromLocalStorage() {
+      try {
+        const cartItems = localStorage.getItem('cart-items');
+        return cartItems ? JSON.parse(cartItems) : [];
+      } catch (e) {
+        console.error('Error reading cart from localStorage:', e);
+        return [];
+      }
+    }
+    
+    function clearCart() {
+      try {
+        localStorage.removeItem('cart-items');
+        setOutput('Cart has been cleared.');
+      } catch (e) {
+        setOutput(`Error clearing cart: ${e.message}`, true);
+      }
+    }
+    
+    async function verifyCart() {
+      try {
+        setOutput('Verifying cart items...');
+        const cartItems = getCartFromLocalStorage();
+        
+        if (!cartItems || cartItems.length === 0) {
+          setOutput('Cart is empty. Nothing to verify.');
+          return;
+        }
+        
+        const response = await fetch('/api/products/verify-cart', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ items: cartItems }),
+        });
+        
+        const data = await response.json();
+        setOutput(JSON.stringify(data, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+    
+    function checkCart() {
+      try {
+        const cart = getCartFromLocalStorage();
+        setOutput(JSON.stringify(cart, null, 2));
+      } catch (error) {
+        setOutput(`Error: ${error.message}`, true);
+      }
+    }
+  </script>
+</body>
+</html> 

@@ -1,0 +1,114 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  orders        Order[]
+  addresses     Address[]
+  paymentMethods PaymentMethod[]
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  price       Float       // Current price
+  originalPrice Float?    // Original price, if there's a discount
+  discount    Float?      // Discount percentage
+  isOnSale    Boolean     @default(false) // Whether it's on sale
+  isFeatured  Boolean     @default(false) // Whether it's a featured product
+  stock       Int
+  category    String
+  status      String      @default("active")
+  images      String[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  userId        String?     // Optional, unregistered users can also place orders
+  customerEmail String
+  customerName  String
+  customerPhone String?
+  address       String
+  city          String
+  country       String
+  postalCode    String
+  status        OrderStatus @default(PENDING)
+  totalAmount   Float       // Order total amount
+  total         Float       // Keep total field for compatibility with existing database
+  paymentMethod String?     // Payment method
+  paymentStatus String?     // Payment status
+  items         OrderItem[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User?       @relation(fields: [userId], references: [id])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  name      String
+  price     Float
+  quantity  Int
+  image     String?
+}
+
+model Address {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String
+  phone       String?
+  address     String
+  city        String
+  country     String
+  postalCode  String
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model PaymentMethod {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String    // CREDIT_CARD, PAYPAL, etc.
+  cardNumber  String?   // Last four digits
+  cardExpiry  String?
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// Order status enum
+enum OrderStatus {
+  PENDING     // Pending
+  PROCESSING  // Processing
+  SHIPPED     // Shipped
+  DELIVERED   // Delivered
+  CANCELLED   // Cancelled
+} 
