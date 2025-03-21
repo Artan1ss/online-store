@@ -5,6 +5,34 @@ declare global {
   var prismaInstance: PrismaClient | undefined;
 }
 
+// Fix potential URL encoding issues
+function getFixedDatabaseUrl() {
+  const url = process.env.DATABASE_URL;
+  
+  if (!url) {
+    console.error('DATABASE_URL environment variable is missing');
+    return undefined;
+  }
+  
+  // Handle potential URL encoding issues
+  try {
+    // Check if the URL contains percent encoding that needs to be fixed
+    if (url.includes('%')) {
+      return decodeURIComponent(url);
+    }
+    
+    // Check for double encoding
+    if (url.includes('postgres%3A')) {
+      return decodeURIComponent(url);
+    }
+    
+    return url;
+  } catch (e) {
+    console.error('Error decoding DATABASE_URL:', e);
+    return url; // Return original URL if decoding fails
+  }
+}
+
 // Create Prisma client class with enhanced error handling
 class PrismaService {
   private static instance: PrismaService;
@@ -19,12 +47,15 @@ class PrismaService {
       this._client = global.prismaInstance;
       console.log('Using existing Prisma instance');
     } else {
+      // Get fixed database URL to avoid encoding issues
+      const fixedDatabaseUrl = getFixedDatabaseUrl();
+      
       // Configure Prisma client with proper logging
       this._client = new PrismaClient({
         log: ['query', 'error', 'warn'],
         datasources: {
           db: {
-            url: process.env.DATABASE_URL,
+            url: fixedDatabaseUrl,
           },
         }
       });
@@ -36,6 +67,7 @@ class PrismaService {
       
       console.log('Creating new Prisma instance');
       console.log('Environment:', process.env.NODE_ENV);
+      console.log('Database URL present:', !!process.env.DATABASE_URL);
       console.log('Database URL length:', process.env.DATABASE_URL?.length ?? 'undefined');
     }
 
