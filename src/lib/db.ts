@@ -123,6 +123,56 @@ class PrismaService {
     }
   }
 
+  // Test database connection explicitly
+  public async testConnection() {
+    try {
+      // Force a new connection attempt
+      console.log('Testing database connection explicitly...');
+      
+      // Try a simple query to test the connection
+      const result = await this._client.$queryRaw`SELECT 1 as connected`;
+      
+      // Check response
+      if (Array.isArray(result) && result.length > 0 && result[0].connected === 1) {
+        this._isConnected = true;
+        console.log('Test connection successful');
+        return {
+          success: true,
+          message: 'Database connection test successful',
+          details: {
+            databaseUrl: process.env.DATABASE_URL ? 
+              `${process.env.DATABASE_URL.substring(0, 15)}...` : 
+              'Not available',
+            environment: process.env.NODE_ENV || 'unknown'
+          }
+        };
+      } else {
+        this._isConnected = false;
+        console.error('Test connection returned unexpected result:', result);
+        return {
+          success: false,
+          message: 'Database connection test returned unexpected result',
+          details: { result }
+        };
+      }
+    } catch (error: any) {
+      this._isConnected = false;
+      console.error('Test connection failed:', error);
+      
+      // Return structured error information
+      return {
+        success: false,
+        message: 'Database connection test failed',
+        error: {
+          message: error.message,
+          code: error.code,
+          meta: error.meta,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }
+      };
+    }
+  }
+
   // Gracefully disconnect
   public async disconnect() {
     if (this._isConnected) {
@@ -136,6 +186,9 @@ class PrismaService {
 // Get Prisma instance
 const prismaService = PrismaService.getInstance();
 export const prisma = prismaService.prisma;
+
+// Export the service for testing purposes
+export const dbService = prismaService;
 
 // Enhanced error handling operation execution function
 export async function executePrismaOperation<T>(
