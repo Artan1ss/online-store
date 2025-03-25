@@ -44,12 +44,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     });
 
-    const uploadedFiles = Array.isArray(files.images) 
-      ? files.images 
-      : files.images 
-        ? [files.images] 
-        : [];
-    const fileUrls = uploadedFiles.map((file: formidable.File) => `/uploads/${path.basename(file.filepath)}`);
+    // Enhanced type safety for file handling
+    const fileField = files.images;
+    const uploadedFiles = fileField 
+      ? (Array.isArray(fileField) 
+          ? fileField 
+          : [fileField]) 
+      : [];
+      
+    const fileUrls = uploadedFiles.map((file) => {
+      // Ensure file has filepath property before accessing
+      if (!file || !file.filepath) {
+        console.warn('Invalid file object encountered');
+        return null;
+      }
+      return `/uploads/${path.basename(file.filepath)}`;
+    }).filter((url): url is string => url !== null);
 
     return res.status(200).json({ urls: fileUrls });
   } catch (error) {

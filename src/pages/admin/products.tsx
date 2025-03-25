@@ -261,14 +261,17 @@ const ProductsManagement = () => {
       if (!response.ok) throw new Error('Upload failed');
 
       const data = await response.json();
-      const newImages = data.urls;
+      // Ensure urls property exists and is an array before spreading
+      const newImages = Array.isArray(data.urls) ? data.urls : [];
+      
       setUploadedImages(prev => [...prev, ...newImages]);
       setFormData(prev => ({
         ...prev,
-        images: [...prev.images, ...newImages],
+        images: [...(Array.isArray(prev.images) ? prev.images : []), ...newImages],
       }));
     } catch (error) {
       setError('Error uploading images');
+      console.error('Upload error:', error);
     } finally {
       setIsUploading(false);
     }

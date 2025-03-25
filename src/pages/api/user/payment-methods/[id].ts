@@ -105,7 +105,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (remainingMethods.length > 0) {
           await executePrismaOperation(
             () => prisma.paymentMethod.update({
-              where: { id: remainingMethods[0].id },
+              where: { 
+                id: remainingMethods[0]?.id
+              },
               data: { isDefault: true }
             }),
             'Failed to update new default payment method'
