@@ -25,17 +25,18 @@ function createPrismaClient() {
     },
   });
 
-  // Add connection error handling
-  client.$on('query', (e) => {
-    if (process.env.NODE_ENV === 'development') {
+  // Add event handlers for development logging
+  if (process.env.NODE_ENV === 'development') {
+    // Using any to bypass TypeScript strictness as Prisma types might not be up to date
+    (client as any).$on('query', (e: any) => {
       console.log('Query: ' + e.query);
       console.log('Duration: ' + e.duration + 'ms');
-    }
-  });
+    });
 
-  client.$on('error', (e) => {
-    console.error('Prisma Client error:', e);
-  });
+    (client as any).$on('error', (e: any) => {
+      console.error('Prisma Client error:', e);
+    });
+  }
 
   return client;
 }
