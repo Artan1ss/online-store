@@ -1,6 +1,25 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient } from '@prisma/client';
 
+// Define diagnostics types
+type Diagnostics = {
+  timestamp: string;
+  environment: string | undefined;
+  platform: string;
+  database_url_exists: boolean;
+  direct_url_exists: boolean;
+  database_url_length: number | undefined;
+  connection_test: boolean | null;
+  raw_query: any | boolean | null;
+  product_test: { success: boolean; count?: number; sample?: any } | null;
+  errors: Array<{ stage: string; message: string; code?: string }>;
+  vercel_region: string;
+  request_headers: {
+    host: string | undefined;
+    user_agent: string | undefined;
+  };
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -14,7 +33,7 @@ export default async function handler(
   });
   
   // Database connection diagnostics
-  const diagnostics = {
+  const diagnostics: Diagnostics = {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
     platform: 'Vercel',
@@ -38,7 +57,7 @@ export default async function handler(
     try {
       await prisma.$connect();
       diagnostics.connection_test = true;
-    } catch (error) {
+    } catch (error: any) {
       diagnostics.connection_test = false;
       diagnostics.errors.push({
         stage: 'connection',
@@ -53,7 +72,7 @@ export default async function handler(
     try {
       const result = await prisma.$queryRaw`SELECT current_database() as database, current_user as user`;
       diagnostics.raw_query = result;
-    } catch (error) {
+    } catch (error: any) {
       diagnostics.raw_query = false;
       diagnostics.errors.push({
         stage: 'raw_query',
@@ -78,7 +97,7 @@ export default async function handler(
         count: products.length,
         sample: products.length > 0 ? products[0] : null
       };
-    } catch (error) {
+    } catch (error: any) {
       diagnostics.product_test = {
         success: false,
       };
@@ -97,7 +116,7 @@ export default async function handler(
       diagnostics
     });
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error testing Vercel database connection:', error);
     
     // Construct detailed error response
