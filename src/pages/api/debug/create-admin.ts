@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { prisma, withPrismaClient } from '@/lib/prisma';
 
 // Define response types
 type SuccessResponse = {
@@ -21,8 +22,6 @@ type ErrorResponse = {
 };
 
 type ApiResponse = SuccessResponse | ErrorResponse;
-
-const prisma = new PrismaClient();
 
 export default async function handler(
   req: NextApiRequest, 
@@ -53,42 +52,44 @@ export default async function handler(
     const adminEmail = 'admin@example.com';
     const password = 'Admin123!'; // Change this immediately after creation
     
-    // Check if admin already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: adminEmail }
-    });
-    
-    if (existingUser) {
-      return res.status(200).json({ 
-        success: true,
-        message: 'Admin user already exists', 
-        userId: existingUser.id,
-        email: existingUser.email,
-        name: existingUser.name || undefined,
-        role: existingUser.role,
-        createdAt: existingUser.createdAt
+    return await withPrismaClient(async (prisma) => {
+      // Check if admin already exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email: adminEmail }
       });
-    }
-    
-    // Create new admin
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newAdmin = await prisma.user.create({
-      data: {
-        email: adminEmail,
-        name: 'Administrator',
-        password: hashedPassword,
-        role: 'ADMIN'
+      
+      if (existingUser) {
+        return res.status(200).json({ 
+          success: true,
+          message: 'Admin user already exists', 
+          userId: existingUser.id,
+          email: existingUser.email,
+          name: existingUser.name || undefined,
+          role: existingUser.role,
+          createdAt: existingUser.createdAt
+        });
       }
-    });
-    
-    return res.status(201).json({ 
-      success: true,
-      message: 'Admin user created successfully',
-      userId: newAdmin.id,
-      email: adminEmail,
-      role: newAdmin.role,
-      createdAt: newAdmin.createdAt,
-      password: 'Use the password defined in code and change immediately'
+      
+      // Create new admin
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const newAdmin = await prisma.user.create({
+        data: {
+          email: adminEmail,
+          name: 'Administrator',
+          password: hashedPassword,
+          role: 'ADMIN'
+        }
+      });
+      
+      return res.status(201).json({ 
+        success: true,
+        message: 'Admin user created successfully',
+        userId: newAdmin.id,
+        email: adminEmail,
+        role: newAdmin.role,
+        createdAt: newAdmin.createdAt,
+        password: 'Use the password defined in code and change immediately'
+      });
     });
   } catch (error) {
     console.error('Error creating admin:', error);
@@ -102,7 +103,5 @@ export default async function handler(
       success: false,
       error: errorMessage
     });
-  } finally {
-    await prisma.$disconnect();
   }
 } 

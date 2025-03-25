@@ -3,6 +3,8 @@ datasource db {
   url      = env("DATABASE_URL")
   // Uncomment for improved connection handling in production
   directUrl = env("DIRECT_URL")
+  // Add connection pooling configuration for Vercel
+  relationMode = "prisma"
 }
 
 generator client {
