@@ -50,11 +50,12 @@ export default function EnhancedProductsDebugPage() {
         }
       });
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      setError(errorMessage);
       setRegularResult({
         status: 'error',
         message: 'Failed to fetch regular products',
-        error: err.message,
+        error: errorMessage,
         timestamp: new Date().toISOString()
       });
     } finally {
@@ -84,11 +85,12 @@ export default function EnhancedProductsDebugPage() {
         }
       });
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      setError(errorMessage);
       setEnhancedResult({
         status: 'error',
         message: 'Failed to fetch enhanced products',
-        error: err.message,
+        error: errorMessage,
         timestamp: new Date().toISOString()
       });
     } finally {
@@ -117,11 +119,12 @@ export default function EnhancedProductsDebugPage() {
         }
       });
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      setError(errorMessage);
       setDirectResult({
         status: 'error',
         message: 'Failed to test direct database connection',
-        error: err.message,
+        error: errorMessage,
         timestamp: new Date().toISOString()
       });
     } finally {
