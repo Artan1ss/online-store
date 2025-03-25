@@ -2,9 +2,39 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient, Product } from '@prisma/client';
 import { getVercelDatabaseUrls } from '@/lib/connection-url';
 
+interface SuccessResponse {
+  status: 'success';
+  message: string;
+  metadata: {
+    connectionType: string;
+    environment: string;
+    timestamp: string;
+  };
+  data: {
+    products: Product[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+      hasNext: boolean;
+    }
+  }
+}
+
+interface ErrorResponse {
+  status: 'error';
+  message: string;
+  error: {
+    message: string;
+    code?: string;
+  };
+  timestamp: string;
+}
+
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse<SuccessResponse | ErrorResponse>
 ) {
   console.log('Enhanced products API called');
   

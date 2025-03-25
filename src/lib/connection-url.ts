@@ -53,7 +53,10 @@ export function generateConnectionUrl(databaseUrl?: string): string | undefined 
 /**
  * Gets database URLs optimized for Vercel deployment
  */
-export function getVercelDatabaseUrls() {
+export function getVercelDatabaseUrls(): { 
+  databaseUrl: string | undefined; 
+  directUrl: string | undefined 
+} {
   const primaryUrl = generateConnectionUrl(process.env.DATABASE_URL);
   const directUrl = process.env.DIRECT_URL || primaryUrl; // Use DIRECT_URL if available
   

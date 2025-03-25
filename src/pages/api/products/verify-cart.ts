@@ -1,13 +1,56 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/db';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+}
+
+interface ProductData {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  images?: string[];
+}
+
+interface RemovedItem {
+  id: string;
+  name: string;
+  reason: string;
+}
+
+interface UpdatedItem {
+  id: string;
+  name: string;
+  oldQuantity: number;
+  newQuantity: number;
+  reason: string;
+}
+
+interface VerifyCartResponse {
+  success: boolean;
+  validItems: CartItem[];
+  validCount: number;
+  removedItems: RemovedItem[];
+  updatedItems: UpdatedItem[];
+  needsUpdate: boolean;
+  message: string;
+}
+
+export default async function handler(
+  req: NextApiRequest, 
+  res: NextApiResponse<VerifyCartResponse | { error: string; message: string }>
+) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed', message: 'Only POST method is allowed' });
   }
 
   try {
-    const { items } = req.body;
+    const { items } = req.body as { items: CartItem[] };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ 
@@ -17,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Extract product IDs from cart items
-    const cartProductIds = items.map((item: { id: string }) => item.id);
+    const cartProductIds = items.map((item: CartItem) => item.id);
     
     // Fetch actual products from the database
     const existingProducts = await prisma.product.findMany({
@@ -36,15 +79,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Create lookup map for faster checking
-    const productMap = new Map();
-    existingProducts.forEach((product: { id: string }) => {
+    const productMap = new Map<string, ProductData>();
+    existingProducts.forEach((product: ProductData) => {
       productMap.set(product.id, product);
     });
 
     // Validate each cart item
-    const validatedItems = [];
-    const removedItems = [];
-    const updatedItems = [];
+    const validatedItems: CartItem[] = [];
+    const removedItems: RemovedItem[] = [];
+    const updatedItems: UpdatedItem[] = [];
 
     for (const item of items) {
       const product = productMap.get(item.id);
@@ -110,7 +153,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Error validating cart:', error);
     return res.status(500).json({
       error: 'Failed to validate cart items',
-      message: error.message
+      message: error.message || 'An unknown error occurred'
     });
   }
 } 
