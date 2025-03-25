@@ -19,7 +19,8 @@
     "type-check": "tsc --noEmit",
     "prepare": "husky install",
     "verify-types": "node scripts/verify-types.js",
-    "prevercel-build": "npm run verify-types-build"
+    "prevercel-build": "npm run verify-types-build",
+    "lint-staged": "lint-staged"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",

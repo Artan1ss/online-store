@@ -6,7 +6,7 @@
  */
 
 const { execSync } = require('child_process');
-const chalk = require('chalk') || { green: (t) => t, red: (t) => t, yellow: (t) => t, blue: (t) => t };
+const chalk = require('chalk') || { green: text => text, red: text => text, yellow: text => text, blue: text => text };
 
 console.log(chalk.blue('🔍 Starting type verification...'));
 
@@ -27,6 +27,7 @@ try {
   execSync('npx tsc --noEmit', { stdio: 'inherit' });
   
   console.log(chalk.green('✅ TypeScript checks passed! Your code should build successfully on Vercel.'));
+  process.exit(0);
 } catch (error) {
   console.log(chalk.red('❌ TypeScript checks failed! These errors will likely appear on Vercel.'));
   console.log(chalk.yellow('Please fix the type errors before deploying to Vercel.'));
