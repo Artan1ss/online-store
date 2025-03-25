@@ -1,84 +1,119 @@
 import { useRouter } from 'next/router';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 
 export default function AuthError() {
   const router = useRouter();
-  const { error } = router.query;
+  const [errorMessage, setErrorMessage] = useState<string>('An authentication error occurred');
 
-  // Map error codes to more user-friendly messages
-  const errorMessages: Record<string, string> = {
-    'CredentialsSignin': 'The email or password you entered is incorrect. Please try again.',
-    'SessionRequired': 'You need to be signed in to access this page.',
-    'AccessDenied': 'You do not have permission to access this page.',
-    'Default': 'An authentication error occurred. Please try again.'
-  };
-
-  // Get the error message based on the error code
-  const errorMessage = error 
-    ? (errorMessages[error as string] || `Error: ${error}`) 
-    : errorMessages.Default;
+  useEffect(() => {
+    const { error } = router.query;
+    
+    if (error) {
+      switch (error) {
+        case 'CredentialsSignin':
+          setErrorMessage('Login failed: Your email or password is incorrect');
+          break;
+        case 'AccessDenied':
+          setErrorMessage('Access denied: You do not have permission to access this page');
+          break;
+        case 'SessionRequired':
+          setErrorMessage('You need to be logged in to access this page');
+          break;
+        case 'DatabaseConnectionError':
+          setErrorMessage('Database connection error: Unable to connect to the database');
+          break;
+        default:
+          setErrorMessage(`Authentication error: ${error}`);
+      }
+    }
+  }, [router.query]);
 
   return (
-    <div className="container mx-auto max-w-md py-12 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Head>
-        <title>Authentication Error</title>
+        <title>Auth Error - NAMarket</title>
+        <meta name="description" content="Authentication error page" />
       </Head>
       
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <div className="bg-red-600 p-4">
-          <h1 className="text-xl font-bold text-white">Authentication Error</h1>
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Authentication Error</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            We encountered a problem with your authentication
+          </p>
         </div>
         
-        <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-            <p className="text-red-800">{errorMessage}</p>
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="rounded-md bg-red-50 p-4 mb-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{errorMessage}</p>
+                </div>
+              </div>
+            </div>
           </div>
           
-          <div className="space-y-4">
-            <div>
-              <h2 className="font-medium mb-2">What would you like to do?</h2>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="/auth/login" className="text-blue-600 hover:underline">
-                    Try logging in again
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/debug/emergency-admin" className="text-red-600 hover:underline font-medium">
-                    Use Emergency Admin Access
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/debug/admin-login" className="text-blue-600 hover:underline">
-                    Go to admin debug page
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/debug/admin-bypass" className="text-blue-600 hover:underline">
-                    Try admin bypass
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/" className="text-blue-600 hover:underline">
-                    Return to home page
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            
-            {error === 'CredentialsSignin' && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                <h3 className="font-medium text-yellow-800 mb-2">Troubleshooting Tips:</h3>
-                <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
-                  <li>Check that you've entered the correct email address</li>
-                  <li>Verify that your password is correct (case sensitive)</li>
-                  <li>If you're an admin user, make sure your account has been created</li>
-                  <li>If problems persist, try the admin debug or bypass options</li>
-                </ul>
-              </div>
-            )}
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-3">What would you like to do?</h3>
+          
+          <ul className="space-y-3">
+            <li>
+              <Link
+                href="/auth/login"
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Try logging in again
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/debug/admin-login"
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Go to admin debug page
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/debug/admin-bypass"
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Try admin bypass
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/debug/emergency-admin"
+                className="text-red-600 hover:text-red-800 font-medium"
+              >
+                Use Emergency Admin Access
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/debug/super-admin"
+                className="text-red-600 hover:text-red-800 font-bold"
+              >
+                Use Super Admin (Cookie Bypass)
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/"
+                className="text-gray-600 hover:text-gray-800 font-medium"
+              >
+                Return to home page
+              </Link>
+            </li>
+          </ul>
         </div>
       </div>
     </div>
