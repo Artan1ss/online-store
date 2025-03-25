@@ -16,6 +16,7 @@ export default async function handler(
 ) {
   const startTime = new Date();
   console.log(`[Products API] Request received: ${req.method} at ${startTime.toISOString()}`);
+  console.log(`[Products API] Query params:`, req.query);
   
   // Only allow GET requests
   if (req.method !== 'GET') {
@@ -29,22 +30,39 @@ export default async function handler(
 
   try {
     console.log('[Products API] Processing product request...');
-    console.log('[Products API] Query params:', req.query);
     
     // Parse query parameters
     const search = req.query.search as string | undefined;
     const category = req.query.category as string | undefined;
-    const minPrice = parseFloatSafe(req.query.minPrice as string);
-    const maxPrice = parseFloatSafe(req.query.maxPrice as string);
+    
+    // Handle potential parsing errors for numeric values
+    let minPrice = undefined;
+    let maxPrice = undefined;
+    
+    try {
+      if (req.query.minPrice) {
+        minPrice = parseFloat(req.query.minPrice as string);
+        if (isNaN(minPrice)) minPrice = 0;
+      }
+      
+      if (req.query.maxPrice) {
+        maxPrice = parseFloat(req.query.maxPrice as string);
+        if (isNaN(maxPrice)) maxPrice = 10000;
+      }
+    } catch (error) {
+      console.warn("[Products API] Error parsing price range, using defaults", error);
+      minPrice = 0;
+      maxPrice = 10000;
+    }
+    
     const isOnSale = req.query.isOnSale === 'true';
     const isFeatured = req.query.isFeatured === 'true';
-    const sort = req.query.sort as string || 'name';
-    const order = req.query.order as 'asc' | 'desc' || 'asc';
+    const sort = req.query.sort as string || 'createdAt';
+    const order = req.query.order as 'asc' | 'desc' || 'desc';
     const limit = parseInt(req.query.limit as string || '50');
     const offset = parseInt(req.query.offset as string || '0');
     
-    // Build query conditions - ensure we use 'status' (which exists in schema) 
-    // instead of 'isPublished' (which doesn't)
+    // Build query conditions
     const where: any = { status: 'active' };
     
     if (search) {
@@ -79,36 +97,12 @@ export default async function handler(
     }
     
     console.log('[Products API] Query conditions:', JSON.stringify(where));
-
-    // Safely determine fields to select, using a fallback approach to handle potential schema differences
-    // between environments
-    let selectFields: Record<string, boolean> | null = null;
+    
     try {
-      // First try with all fields we expect to be in the schema
-      selectFields = {
-        id: true,
-        name: true,
-        description: true,
-        price: true,
-        originalPrice: true,
-        discount: true,
-        isOnSale: true,
-        isFeatured: true,
-        stock: true,
-        category: true,
-        status: true,
-        images: true,
-        createdAt: true,
-        updatedAt: true,
-      };
-      
-      // Execute the database query with enhanced error handling
+      // First try querying with executePrismaOperation for better error handling
       const products = await executePrismaOperation(async () => {
-        console.log('[Products API] Executing Prisma query...');
-        
-        return prisma.product.findMany({
+        return await prisma.product.findMany({
           where,
-          select: selectFields,
           orderBy: {
             [sort]: order,
           },
@@ -149,58 +143,53 @@ export default async function handler(
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {
-      console.error('[Products API] Error with full select fields:', error);
+      console.error('[Products API] Error executing Prisma query:', error);
       
-      // If there was an error, try with minimal fields that must exist
-      if (error.message.includes('Unknown argument')) {
-        console.log('[Products API] Falling back to minimal field selection');
+      // If the first attempt fails, try a simpler fallback query
+      console.log('[Products API] Trying fallback query');
+      
+      try {
+        // Direct Prisma client call with minimal fields
+        const products = await prisma.product.findMany({
+          where,
+          orderBy: {
+            [sort]: order,
+          },
+          skip: offset,
+          take: limit,
+        });
         
-        try {
-          // Use only the minimal set of fields guaranteed to exist
-          const products = await prisma.product.findMany({
-            where,
-            orderBy: {
-              [sort]: order,
+        console.log(`[Products API] Found ${products.length} products with fallback query`);
+        
+        // Get total count for pagination
+        const total = await prisma.product.count({ where });
+        
+        // Success response
+        const responseTime = new Date().getTime() - startTime.getTime();
+        console.log(`[Products API] Request completed with fallback in ${responseTime}ms`);
+        
+        return res.status(200).json({
+          status: 'success',
+          message: 'Products retrieved successfully (with fallback)',
+          data: {
+            products,
+            pagination: {
+              total,
+              limit,
+              offset,
+              hasMore: offset + products.length < total,
             },
-            skip: offset,
-            take: limit,
-          });
-          
-          console.log(`[Products API] Found ${products.length} products with fallback query`);
-          
-          // Get total count for pagination
-          const total = await prisma.product.count({ where });
-          
-          // Success response
-          const responseTime = new Date().getTime() - startTime.getTime();
-          console.log(`[Products API] Request completed with fallback in ${responseTime}ms`);
-          
-          return res.status(200).json({
-            status: 'success',
-            message: 'Products retrieved successfully (with fallback)',
-            data: {
-              products,
-              pagination: {
-                total,
-                limit,
-                offset,
-                hasMore: offset + products.length < total,
-              },
-              meta: {
-                responseTimeMs: responseTime,
-                fallback: true,
-              }
-            },
-            timestamp: new Date().toISOString(),
-          });
-        } catch (fallbackError: any) {
-          // Even the fallback failed, rethrow with more context
-          console.error('[Products API] Fallback query also failed:', fallbackError);
-          throw new Error(`Fallback query failed: ${fallbackError.message}`);
-        }
-      } else {
-        // If it wasn't a field selection error, rethrow the original error
-        throw error;
+            meta: {
+              responseTimeMs: responseTime,
+              fallback: true,
+            }
+          },
+          timestamp: new Date().toISOString(),
+        });
+      } catch (fallbackError: any) {
+        // Even the fallback failed, provide detailed error
+        console.error('[Products API] Fallback query also failed:', fallbackError);
+        throw new Error(`Database query failed: ${fallbackError.message}`);
       }
     }
   } catch (error: any) {
@@ -220,15 +209,14 @@ export default async function handler(
   }
 }
 
-// Helper function to safely parse float values
-function parseFloatSafe(value: string | undefined): number | undefined {
-  if (!value) return undefined;
+// Helper function to safely parse floats with fallback
+function parseFloatSafe(value: string | undefined, fallback?: number): number | undefined {
+  if (value === undefined) return fallback;
   
   try {
     const parsed = parseFloat(value);
-    return isNaN(parsed) ? undefined : parsed;
+    return isNaN(parsed) ? fallback : parsed;
   } catch (e) {
-    console.warn(`[Products API] Failed to parse value: ${value}`);
-    return undefined;
+    return fallback;
   }
 } 

@@ -110,22 +110,28 @@ export default function ProductsPage() {
         }
         
         const result: ApiResponse = await response.json();
+        console.log('API Response:', result);
         
         if (result.status === 'error') {
           throw new Error(result.error || result.message || 'Unknown error occurred');
         }
         
         if (!result.data || !Array.isArray(result.data.products)) {
+          console.error('Invalid data format:', result);
           throw new Error('Invalid data format received from server');
         }
         
-        setProducts(result.data.products);
-        setTotalProducts(result.data.pagination.total);
-        setHasMore(result.data.pagination.hasMore);
+        // Make sure we handle the products safely
+        const validProducts = result.data.products.filter(p => p && typeof p === 'object');
+        console.log(`Found ${validProducts.length} valid products`);
+        
+        setProducts(validProducts);
+        setTotalProducts(result.data.pagination.total || 0);
+        setHasMore(result.data.pagination.hasMore || false);
         
         // Extract all unique categories
         const uniqueCategories = Array.from(
-          new Set(result.data.products.map(product => product.category).filter(Boolean))
+          new Set(validProducts.map(product => product.category).filter(Boolean))
         ) as string[];
         
         setCategories(uniqueCategories);
@@ -205,6 +211,47 @@ export default function ProductsPage() {
   const changePage = (newPage: number) => {
     window.scrollTo(0, 0);
     setCurrentPage(newPage);
+  };
+
+  // Calculate product display price
+  const getDisplayPrice = (product: Product) => {
+    if (product.isOnSale && product.discount) {
+      const discountAmount = product.price * (product.discount / 100);
+      return product.price - discountAmount;
+    }
+    return product.price;
+  };
+
+  // Get product image
+  const getProductImage = (product: Product) => {
+    // First check if the product has images array
+    if (product.images && product.images.length > 0) {
+      return product.images[0];
+    }
+    
+    // Fallback to imageUrl if it exists
+    if (product.imageUrl) {
+      return product.imageUrl;
+    }
+    
+    // Default placeholder
+    return '/placeholder.png';
+  };
+
+  // Get product stock
+  const getProductStock = (product: Product) => {
+    // First check stock field
+    if (typeof product.stock === 'number') {
+      return product.stock;
+    }
+    
+    // Fallback to inventory if it exists
+    if (typeof product.inventory === 'number') {
+      return product.inventory;
+    }
+    
+    // Default to 0
+    return 0;
   };
 
   return (
@@ -381,7 +428,7 @@ export default function ProductsPage() {
                     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full">
                       <div className="aspect-w-3 aspect-h-2 relative">
                         <img
-                          src={product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/placeholder.png')}
+                          src={getProductImage(product)}
                           alt={product.name}
                           className="w-full h-48 object-cover"
                           onError={(e) => {
@@ -408,7 +455,7 @@ export default function ProductsPage() {
                             {product.isOnSale && product.discount ? (
                               <>
                                 <span className="text-lg font-bold text-red-600">
-                                  ${(product.price * (1 - product.discount / 100)).toFixed(2)}
+                                  ${(getDisplayPrice(product)).toFixed(2)}
                                 </span>
                                 <span className="ml-2 text-sm text-gray-500 line-through">
                                   ${product.price.toFixed(2)}
@@ -419,8 +466,8 @@ export default function ProductsPage() {
                             )}
                           </div>
                           <span className="text-sm text-gray-500">
-                            {(product.stock ?? product.inventory ?? 0) > 0 
-                              ? `${product.stock ?? product.inventory ?? 0} in stock` 
+                            {getProductStock(product) > 0 
+                              ? `${getProductStock(product)} in stock` 
                               : 'Out of stock'}
                           </span>
                         </div>
@@ -432,7 +479,7 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   </Link>
-                  {(product.stock ?? product.inventory ?? 0) > 0 && (
+                  {(getProductStock(product)) > 0 && (
                     <button
                       onClick={(e) => handleAddToCart(e, product)}
                       className="absolute bottom-4 right-4 bg-blue-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
