@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Product } from '@prisma/client';
 import { getVercelDatabaseUrls } from '@/lib/connection-url';
 
 export default async function handler(
@@ -40,7 +40,7 @@ export default async function handler(
     }
     
     // Execute query with retry logic
-    let products = [];
+    let products: Product[] = [];
     let retryCount = 0;
     const maxRetries = 3;
     
@@ -60,7 +60,7 @@ export default async function handler(
         break;
       } catch (error) {
         retryCount++;
-        console.error(`Query attempt ${retryCount} failed:`, error.message);
+        console.error(`Query attempt ${retryCount} failed:`, error instanceof Error ? error.message : String(error));
         
         if (retryCount >= maxRetries) {
           throw error; // Rethrow if max retries reached
@@ -94,7 +94,7 @@ export default async function handler(
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in enhanced products API:', error);
     
     // Return error response
@@ -102,7 +102,7 @@ export default async function handler(
       status: 'error',
       message: 'Failed to retrieve products',
       error: {
-        message: error.message,
+        message: error.message || String(error),
         code: error.code
       },
       timestamp: new Date().toISOString()
