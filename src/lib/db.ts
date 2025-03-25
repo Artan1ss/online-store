@@ -161,4 +161,52 @@ process.on('beforeExit', async () => {
   await prisma.$disconnect();
 });
 
+// Database service for common operations
+export const dbService = {
+  async testConnection() {
+    try {
+      // Try a simple query to check if the database is reachable
+      await prisma.$queryRaw`SELECT 1 as connected`;
+      
+      // Get database metadata
+      const tables = await prisma.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`;
+      const productCount = await prisma.product.count().catch(() => 'N/A');
+      const orderCount = await prisma.order.count().catch(() => 'N/A');
+      const userCount = await prisma.user.count().catch(() => 'N/A');
+      
+      return {
+        success: true,
+        message: 'Successfully connected to database',
+        details: {
+          tables: Array.isArray(tables) ? tables.length : 0,
+          tableList: tables,
+          counts: {
+            products: productCount,
+            orders: orderCount, 
+            users: userCount
+          },
+          environment: process.env.NODE_ENV,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error: any) {
+      console.error('Database connection test failed:', error);
+      
+      return {
+        success: false,
+        message: 'Failed to connect to database',
+        error: {
+          message: error.message,
+          code: error.code || 'UNKNOWN',
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        },
+        details: {
+          environment: process.env.NODE_ENV,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+  }
+};
+
 export default prisma; 
