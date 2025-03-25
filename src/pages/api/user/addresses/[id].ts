@@ -115,7 +115,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Failed to find remaining addresses'
         );
 
-        if (remainingAddresses.length > 0) {
+        // Check if there are any remaining addresses and if the first one has an id
+        if (remainingAddresses.length > 0 && remainingAddresses[0]?.id) {
           await executePrismaOperation(
             () => prisma.address.update({
               where: { id: remainingAddresses[0].id },
