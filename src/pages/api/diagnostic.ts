@@ -98,15 +98,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Database credentials check (redacted for security)
   if (process.env.DATABASE_URL) {
     const dbUrlParts = process.env.DATABASE_URL.split('@');
-    const credentials = dbUrlParts[0].split('://')[1];
-    const [user, pass] = credentials.split(':');
-    
-    diagnosticInfo.database.credentials = {
-      user: user || 'missing',
-      password: pass ? '********' : 'missing',
-      format: dbUrlParts.length > 1 ? 'valid' : 'invalid',
-      url_length: process.env.DATABASE_URL.length,
-    };
+    // Check if dbUrlParts has at least one element and it contains '://'
+    if (dbUrlParts.length > 0 && dbUrlParts[0].includes('://')) {
+      const urlParts = dbUrlParts[0].split('://');
+      const credentials = urlParts.length > 1 ? urlParts[1] : '';
+      
+      if (credentials && credentials.includes(':')) {
+        const [user, pass] = credentials.split(':');
+        
+        diagnosticInfo.database.credentials = {
+          user: user || 'missing',
+          password: pass ? '********' : 'missing',
+          format: dbUrlParts.length > 1 ? 'valid' : 'invalid',
+          url_length: process.env.DATABASE_URL.length,
+        };
+      } else {
+        diagnosticInfo.database.credentials = {
+          error: 'Invalid credentials format in DATABASE_URL'
+        };
+      }
+    } else {
+      diagnosticInfo.database.credentials = {
+        error: 'Invalid DATABASE_URL format'
+      };
+    }
   } else {
     diagnosticInfo.database.credentials = {
       error: 'DATABASE_URL environment variable is missing'
