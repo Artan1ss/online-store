@@ -23,8 +23,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Extract components without revealing sensitive info
     const urlParts = url.split('@');
     if (urlParts.length > 1) {
-      const hostPart = urlParts[1].split('/')[0];
-      const dbPart = urlParts[1].split('/')[1];
+      // Get the part after the @ symbol
+      const secondPart = urlParts[1];
+      
+      // Safely split the second part by '/'
+      const pathParts = secondPart.split('/');
+      const hostPart = pathParts.length > 0 ? pathParts[0] : '';
+      const dbPart = pathParts.length > 1 ? pathParts[1] : '';
       
       dbUrlInfo = {
         host: hostPart,
