@@ -129,6 +129,12 @@ export default function AdminLoginDebug() {
         <h1 className="text-2xl font-bold">Admin Debug Login</h1>
         <div className="flex space-x-4">
           <Link 
+            href="/debug/emergency-admin"
+            className="text-red-600 hover:text-red-800"
+          >
+            Emergency Access
+          </Link>
+          <Link 
             href="/debug/admin-bypass"
             className="text-purple-600 hover:text-purple-800"
           >

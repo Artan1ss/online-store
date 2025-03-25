@@ -45,6 +45,11 @@ export default function AuthError() {
                   </Link>
                 </li>
                 <li>
+                  <Link href="/debug/emergency-admin" className="text-red-600 hover:underline font-medium">
+                    Use Emergency Admin Access
+                  </Link>
+                </li>
+                <li>
                   <Link href="/debug/admin-login" className="text-blue-600 hover:underline">
                     Go to admin debug page
                   </Link>

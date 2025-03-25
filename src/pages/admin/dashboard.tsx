@@ -60,8 +60,15 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
+        setError('');
         // Fetch orders
         const ordersResponse = await fetch('/api/admin/orders');
+        
+        if (!ordersResponse.ok) {
+          throw new Error(`Failed to fetch orders: ${ordersResponse.statusText}`);
+        }
+        
         const ordersData = await ordersResponse.json();
         setOrders(ordersData);
 
@@ -69,52 +76,76 @@ export default function AdminDashboard() {
         const pendingOrders = ordersData.filter((order: Order) => order.status === 'PENDING').length;
         const totalRevenue = ordersData.reduce((sum: number, order: Order) => sum + order.totalAmount, 0);
         
-        // Fetch product count (mock data for now)
-        const productsCount = 245;
-        
-        // Fetch user count (mock data for now)
-        const usersCount = 1234;
-        
+        // For testing: if database access fails, use mock data
         setStats({
-          totalOrders: ordersData.length,
-          pendingOrders,
-          totalRevenue,
-          totalProducts: productsCount,
-          totalUsers: usersCount
+          totalOrders: ordersData.length || 0,
+          pendingOrders: pendingOrders || 0,
+          totalRevenue: totalRevenue || 0,
+          totalProducts: 0,
+          totalUsers: 0
         });
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // Use mock data if database fails
+        setOrders([]);
+        setStats({
+          totalOrders: 0,
+          pendingOrders: 0,
+          totalRevenue: 0,
+          totalProducts: 0,
+          totalUsers: 0
+        });
+        setError('Failed to load dashboard data. Database connection issue.');
       } finally {
         setLoading(false);
       }
     };
 
-    if (session) {
+    // Only fetch data when session is definitely available and authenticated
+    if (session && status === 'authenticated' && session.user.role === 'ADMIN') {
       fetchData();
     }
-  }, [session]);
+  }, [session, status]);
 
   useEffect(() => {
     const fetchDbStats = async () => {
       try {
         setLoading(true);
+        setError('');
         const res = await fetch('/api/admin/db-monitor');
         if (!res.ok) {
-          throw new Error('Failed to fetch database status');
+          throw new Error(`Failed to fetch database status: ${res.statusText}`);
         }
         const data = await res.json();
         setDbStats(data);
       } catch (err: any) {
+        console.error('Database status fetch error:', err);
         setError(err.message || 'An error occurred while fetching database status');
+        // Set default/empty values
+        setDbStats({
+          status: 'error',
+          timestamp: new Date().toISOString(),
+          metrics: {
+            users: 0,
+            products: 0,
+            orders: 0,
+            orderItems: 0,
+            addresses: 0,
+            paymentMethods: 0
+          },
+          recentOrders: [],
+          lowStockProducts: []
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    if (session) {
+    // Only fetch when session is authenticated and confirmed as admin
+    if (session && status === 'authenticated' && session.user.role === 'ADMIN') {
       fetchDbStats();
     }
-  }, [session]);
+  }, [session, status]);
 
   // Get status badge class
   const getStatusBadgeClass = (status: OrderStatus) => {

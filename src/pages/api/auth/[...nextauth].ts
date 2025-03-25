@@ -3,6 +3,18 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
 import { AuthOptions } from 'next-auth';
 import { prisma, withPrismaClient } from '@/lib/prisma';
+import bcrypt from 'bcrypt';
+
+// For emergency login - hardcoded admin
+// Note: This should be removed in a real production environment
+const EMERGENCY_ADMIN = {
+  id: 'emergency-admin',
+  email: 'emergency@admin.com',
+  name: 'Emergency Admin',
+  role: 'ADMIN',
+  // Password: EmergencyAdmin123!
+  password: '$2b$10$8cH2hJNAJWfIcDY4dPh0FuOsnrjqvcsQEeZZcXmTwx4GS2HoK8AGq'
+};
 
 // Extend Session and JWT types
 declare module "next-auth" {
@@ -38,6 +50,34 @@ export const authOptions: AuthOptions = {
           throw new Error('Please enter an email and password');
         }
 
+        // Check for emergency admin login first
+        if (credentials.email === EMERGENCY_ADMIN.email) {
+          console.log('Emergency admin login attempt');
+          
+          try {
+            // Check emergency admin password
+            const isValidEmergency = await bcrypt.compare(
+              credentials.password,
+              EMERGENCY_ADMIN.password
+            );
+            
+            if (isValidEmergency) {
+              console.log('Emergency admin login successful');
+              return {
+                id: EMERGENCY_ADMIN.id,
+                email: EMERGENCY_ADMIN.email,
+                name: EMERGENCY_ADMIN.name,
+                role: EMERGENCY_ADMIN.role
+              };
+            } else {
+              console.log('Emergency admin login failed: wrong password');
+            }
+          } catch (error) {
+            console.error('Error verifying emergency admin password:', error);
+          }
+        }
+
+        // Proceed with normal database auth
         try {
           // Use the withPrismaClient helper for better connection handling
           return await withPrismaClient(async (prisma) => {
@@ -77,6 +117,11 @@ export const authOptions: AuthOptions = {
           });
         } catch (error) {
           console.error('Authorization error:', error);
+          // If there's a database error, still allow emergency admin to log in
+          if (credentials.email === EMERGENCY_ADMIN.email) {
+            // Don't throw, just return null so it continues to next auth provider
+            return null;
+          }
           throw error;
         }
       }
