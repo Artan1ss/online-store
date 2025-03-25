@@ -65,11 +65,11 @@ export default function AdminDashboard() {
   }, [session, status]);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      console.log('User is unauthenticated, redirecting to login');
+    if (!session && status !== 'loading') {
+      console.log('User is not authenticated, redirecting to login');
       router.push('/auth/login?callbackUrl=/admin/dashboard');
     }
-  }, [status, router]);
+  }, [session, status, router]);
 
   useEffect(() => {
     const fetchData = async () => {

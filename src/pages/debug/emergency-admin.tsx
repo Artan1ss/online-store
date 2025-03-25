@@ -6,8 +6,8 @@ import Link from 'next/link';
 
 export default function EmergencyAdminAccess() {
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
   const router = useRouter();
 
   const emergencyCredentials = {
@@ -18,8 +18,8 @@ export default function EmergencyAdminAccess() {
   const handleEmergencyLogin = async () => {
     try {
       setLoading(true);
-      setMessage(null);
-      setDebugInfo(null);
+      setMessage('');
+      setDebugInfo('');
       
       console.log('Attempting emergency login with:', emergencyCredentials.email);
       
@@ -30,8 +30,15 @@ export default function EmergencyAdminAccess() {
         callbackUrl: '/admin/dashboard'
       });
       
-      console.log('SignIn result:', JSON.stringify(result));
-      setDebugInfo(JSON.stringify(result, null, 2));
+      // Safely stringify the result
+      const resultStr = JSON.stringify(result || {});
+      console.log('SignIn result:', resultStr);
+      
+      // Set debug info - ensure we always have a string
+      const debugOutput = result 
+        ? JSON.stringify(result, null, 2) 
+        : 'No result data returned';
+      setDebugInfo(debugOutput);
       
       if (result?.error) {
         setMessage(`Login failed: ${result.error}`);
@@ -39,18 +46,29 @@ export default function EmergencyAdminAccess() {
       } else if (result?.url) {
         setMessage('Login successful! Redirecting...');
         setTimeout(() => {
-          window.location.href = result.url; // Use window.location instead of router for hard redirect
+          // Ensure we have a string for window.location.href
+          window.location.href = result.url || '/admin/dashboard';
         }, 1500);
       } else {
         setMessage('Login successful! Redirecting...');
         setTimeout(() => {
-          window.location.href = '/admin/dashboard'; // Fallback redirect
+          window.location.href = '/admin/dashboard';
         }, 1500);
       }
     } catch (error) {
       console.error('Emergency login exception:', error);
-      setMessage(`An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`);
-      setDebugInfo(error instanceof Error ? error.stack || 'No stack trace' : 'Unknown error type');
+      
+      // Create a safe error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Unknown error occurred';
+      setMessage(`An unexpected error occurred: ${errorMessage}`);
+      
+      // Create a safe stack trace string
+      const stackTrace = error instanceof Error 
+        ? (error.stack || 'No stack trace available') 
+        : 'Error details not available';
+      setDebugInfo(stackTrace);
     } finally {
       setLoading(false);
     }
