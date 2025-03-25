@@ -98,9 +98,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Database credentials check (redacted for security)
   if (process.env.DATABASE_URL) {
     const dbUrlParts = process.env.DATABASE_URL.split('@');
-    // Check if dbUrlParts has at least one element and it contains '://'
-    if (dbUrlParts.length > 0 && dbUrlParts[0].includes('://')) {
-      const urlParts = dbUrlParts[0].split('://');
+    // Use a safer approach to access array elements
+    const firstPart = dbUrlParts[0]; // This might be undefined in TypeScript's view
+    
+    if (firstPart && firstPart.includes('://')) {
+      const urlParts = firstPart.split('://');
       const credentials = urlParts.length > 1 ? urlParts[1] : '';
       
       if (credentials && credentials.includes(':')) {
