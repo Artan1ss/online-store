@@ -1,194 +1,122 @@
 import { PrismaClient } from '@prisma/client';
+import { getVercelDatabaseUrls } from './connection-url';
 
-// For global variable declaration, supports hot reload
-declare global {
-  var prismaInstance: PrismaClient | undefined;
-}
+// Check if we're in a production environment
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Fix potential URL encoding issues
-function getFixedDatabaseUrl() {
+// Determine whether to use logging
+const prismaLogLevels = isProduction 
+  ? ['error', 'warn'] 
+  : ['query', 'info', 'warn', 'error'];
+
+// Function to get a fixed database URL without double encoding issues
+export function getFixedDatabaseUrl() {
   const url = process.env.DATABASE_URL;
   
   if (!url) {
-    console.error('DATABASE_URL environment variable is missing');
+    console.warn('DATABASE_URL environment variable is not set');
     return undefined;
   }
   
-  // Handle potential URL encoding issues
   try {
-    // Check if the URL contains percent encoding that needs to be fixed
-    if (url.includes('%')) {
+    // Check if URL is already correctly formatted
+    if (url.includes('%3A%2F%2F')) {
+      // URL is double-encoded, let's fix it
       return decodeURIComponent(url);
     }
     
-    // Check for double encoding
-    if (url.includes('postgres%3A')) {
-      return decodeURIComponent(url);
-    }
-    
+    // URL looks correctly formatted
     return url;
-  } catch (e) {
-    console.error('Error decoding DATABASE_URL:', e);
-    return url; // Return original URL if decoding fails
+  } catch (error) {
+    console.error('Error processing DATABASE_URL:', error);
+    // Return original URL if we can't process it
+    return url;
   }
 }
 
-// Create Prisma client class with enhanced error handling
-class PrismaService {
-  private static instance: PrismaService;
-  private _client: PrismaClient;
-  private _isConnected: boolean = false;
-  private _connectionAttempts: number = 0;
-  private readonly MAX_CONNECTION_ATTEMPTS = 3;
+// Create a singleton PrismaClient instance
+let prisma: PrismaClient;
 
-  private constructor() {
-    // Check if a global instance already exists
-    if (global.prismaInstance) {
-      this._client = global.prismaInstance;
-      console.log('Using existing Prisma instance');
-    } else {
-      // Get fixed database URL to avoid encoding issues
-      const fixedDatabaseUrl = getFixedDatabaseUrl();
-      
-      // Configure Prisma client with proper logging
-      this._client = new PrismaClient({
-        log: ['query', 'error', 'warn'],
-        datasources: {
-          db: {
-            url: fixedDatabaseUrl,
-          },
-        }
-      });
-      
-      if (process.env.NODE_ENV !== 'production') {
-        // Cache connection in development environment
-        global.prismaInstance = this._client;
-      }
-      
-      console.log('Creating new Prisma instance');
-      console.log('Environment:', process.env.NODE_ENV);
-      console.log('Database URL present:', !!process.env.DATABASE_URL);
-      console.log('Database URL length:', process.env.DATABASE_URL?.length ?? 'undefined');
-    }
-
-    // Connect to database
-    this.connect();
-  }
-
-  // Get instance using singleton pattern
-  public static getInstance(): PrismaService {
-    if (!PrismaService.instance) {
-      PrismaService.instance = new PrismaService();
-    }
-    return PrismaService.instance;
-  }
-
-  // Get client
-  public get prisma(): PrismaClient {
-    return this._client;
-  }
-
-  // Connect to database
-  private async connect() {
+// Logic to handle retrying database connections with exponential backoff
+async function connectWithRetry(client: PrismaClient, maxRetries = 5): Promise<void> {
+  let retries = 0;
+  let lastError: Error | null = null;
+  
+  while (retries < maxRetries) {
     try {
-      if (!this._isConnected && this._connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
-        this._connectionAttempts++;
-        console.log(`Attempting database connection (${this._connectionAttempts}/${this.MAX_CONNECTION_ATTEMPTS})...`);
-        
-        // Try a simple query to test the connection
-        await this._client.$queryRaw`SELECT 1 as connected`;
-        
-        this._isConnected = true;
-        this._connectionAttempts = 0;
-        
-        console.log('Successfully connected to database');
-      }
-    } catch (error: any) {
-      console.error('Database connection failed:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        meta: error.meta
-      });
+      // Attempt to connect
+      await client.$connect();
+      console.log('Successfully connected to the database');
+      return;
+    } catch (error) {
+      lastError = error;
+      retries++;
+      const delay = Math.min(Math.pow(2, retries) * 1000, 10000); // Exponential backoff, max 10s
       
-      // Try to reconnect
-      if (this._connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
-        console.log(`Attempting to reconnect (${this._connectionAttempts}/${this.MAX_CONNECTION_ATTEMPTS})...`);
-        
-        // Retry after a short delay with exponential backoff
-        setTimeout(() => this.connect(), 1000 * Math.pow(2, this._connectionAttempts));
-      } else {
-        console.error('Maximum retry attempts reached, cannot connect to database');
-      }
+      console.error(
+        `Database connection attempt ${retries} failed. Retrying in ${delay}ms...`,
+        error.message || error
+      );
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
+  
+  // If we get here, all retries have failed
+  console.error(`Failed to connect to database after ${maxRetries} attempts`);
+  throw lastError;
+}
 
-  // Test database connection explicitly
-  public async testConnection() {
-    try {
-      // Force a new connection attempt
-      console.log('Testing database connection explicitly...');
-      
-      // Try a simple query to test the connection
-      const result = await this._client.$queryRaw`SELECT 1 as connected`;
-      
-      // Check response
-      if (Array.isArray(result) && result.length > 0 && result[0].connected === 1) {
-        this._isConnected = true;
-        console.log('Test connection successful');
-        return {
-          success: true,
-          message: 'Database connection test successful',
-          details: {
-            databaseUrl: process.env.DATABASE_URL ? 
-              `${process.env.DATABASE_URL.substring(0, 15)}...` : 
-              'Not available',
-            environment: process.env.NODE_ENV || 'unknown'
-          }
-        };
-      } else {
-        this._isConnected = false;
-        console.error('Test connection returned unexpected result:', result);
-        return {
-          success: false,
-          message: 'Database connection test returned unexpected result',
-          details: { result }
-        };
-      }
-    } catch (error: any) {
-      this._isConnected = false;
-      console.error('Test connection failed:', error);
-      
-      // Return structured error information
-      return {
-        success: false,
-        message: 'Database connection test failed',
-        error: {
-          message: error.message,
-          code: error.code,
-          meta: error.meta,
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        }
-      };
-    }
+if (process.env.NODE_ENV === 'production') {
+  // In production, use the optimized connection URLs
+  const { databaseUrl, directUrl } = getVercelDatabaseUrls();
+  
+  console.log(`Using optimized database connection for production environment`);
+  
+  prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: databaseUrl,
+      },
+    },
+    log: prismaLogLevels,
+  });
+  
+  // Log connection details (without showing credentials)
+  const dbUrlSafe = databaseUrl.replace(/\/\/[^:]+:[^@]+@/, '//USER:PASSWORD@');
+  console.log(`Database connection configured with optimized URL: ${dbUrlSafe}`);
+  
+  if (directUrl) {
+    const directUrlSafe = directUrl.replace(/\/\/[^:]+:[^@]+@/, '//USER:PASSWORD@');
+    console.log(`Direct URL available: ${directUrlSafe}`);
   }
-
-  // Gracefully disconnect
-  public async disconnect() {
-    if (this._isConnected) {
-      await this._client.$disconnect();
-      this._isConnected = false;
-      console.log('Database connection closed');
-    }
+} else {
+  // In development, use the standard environment variable with fixing
+  const fixedUrl = getFixedDatabaseUrl();
+  
+  prisma = new PrismaClient({
+    datasources: {
+      db: {
+        url: fixedUrl,
+      },
+    },
+    log: prismaLogLevels,
+  });
+  
+  if (fixedUrl) {
+    const dbUrlSafe = fixedUrl.replace(/\/\/[^:]+:[^@]+@/, '//USER:PASSWORD@');
+    console.log(`Development database connection configured: ${dbUrlSafe}`);
   }
 }
 
-// Get Prisma instance
-const prismaService = PrismaService.getInstance();
-export const prisma = prismaService.prisma;
+// Handle connection on initialization with retry logic
+connectWithRetry(prisma).catch(error => {
+  console.error('Failed to initialize database connection', error);
+});
 
-// Export the service for testing purposes
-export const dbService = prismaService;
+// Export the client instance
+export { prisma };
 
 // Enhanced error handling operation execution function
 export async function executePrismaOperation<T>(
@@ -225,7 +153,7 @@ export async function executePrismaOperation<T>(
 
 // Graceful shutdown handling
 process.on('beforeExit', async () => {
-  await prismaService.disconnect();
+  await prisma.$disconnect();
 });
 
 export default prisma; 
