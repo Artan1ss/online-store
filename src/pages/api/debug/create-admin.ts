@@ -1,12 +1,38 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, User } from '@prisma/client';
 import bcrypt from 'bcrypt';
+
+// Define response types
+type SuccessResponse = {
+  success: true;
+  message: string;
+  userId: string;
+  email: string;
+  name?: string;
+  role?: string;
+  createdAt?: Date;
+  password?: string;
+};
+
+type ErrorResponse = {
+  success: false;
+  error: string;
+  info?: string;
+};
+
+type ApiResponse = SuccessResponse | ErrorResponse;
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest, 
+  res: NextApiResponse<ApiResponse>
+) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed, use POST' });
+    return res.status(405).json({ 
+      success: false, 
+      error: 'Method not allowed, use POST' 
+    });
   }
 
   // A simple security check to prevent unwanted admin creation
@@ -17,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!allowAdminCreation) {
     return res.status(403).json({ 
+      success: false,
       error: 'Admin creation not allowed in this environment',
       info: 'Set ALLOW_ADMIN_CREATION=true in your environment variables to enable this functionality'
     });
@@ -37,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: 'Admin user already exists', 
         userId: existingUser.id,
         email: existingUser.email,
-        name: existingUser.name,
+        name: existingUser.name || undefined,
         role: existingUser.role,
         createdAt: existingUser.createdAt
       });

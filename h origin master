@@ -1,0 +1,7 @@
+[33mcommit 8e262e0b74a5c5fe02b7471d336df080be355711[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: Artan1ss <xuefeng0580@gmail.com>
+Date:   Mon Mar 24 23:17:37 2025 -0400
+
+    Fix TypeScript error in enhanced-products.tsx for unknown error type
+
+src/pages/debug/enhanced-products.tsx

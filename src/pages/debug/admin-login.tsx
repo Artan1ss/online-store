@@ -1,8 +1,33 @@
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, SignInResponse } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+
+// Define types for API responses
+type ConnectionResponse = {
+  success: boolean;
+  message: string;
+  error?: string;
+  timestamp?: string;
+  serverTime?: Date;
+  database?: string;
+  stats?: {
+    userCount: number;
+  };
+  [key: string]: any;
+};
+
+type AdminUserResponse = {
+  success: boolean;
+  message: string;
+  userId?: string;
+  email?: string;
+  role?: string;
+  error?: string;
+  password?: string;
+  [key: string]: any;
+};
 
 export default function AdminLoginDebug() {
   const [email, setEmail] = useState('');
@@ -36,7 +61,8 @@ export default function AdminLoginDebug() {
         }, 1500);
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(errorMessage);
       console.error(err);
     } finally {
       setLoading(false);
@@ -49,15 +75,16 @@ export default function AdminLoginDebug() {
     
     try {
       const response = await fetch('/api/debug/test-connection');
-      const data = await response.json();
+      const data: ConnectionResponse = await response.json();
       
       if (response.ok) {
-        setConnectionStatus(`Connection successful: ${JSON.stringify(data)}`);
+        setConnectionStatus(`Connection successful: ${JSON.stringify(data, null, 2)}`);
       } else {
         setConnectionStatus(`Connection failed: ${data.error || 'Unknown error'}`);
       }
     } catch (err) {
-      setConnectionStatus(`Error testing connection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setConnectionStatus(`Error testing connection: ${errorMessage}`);
     } finally {
       setConnectionLoading(false);
     }
@@ -73,18 +100,19 @@ export default function AdminLoginDebug() {
         method: 'POST'
       });
       
-      const data = await response.json();
+      const data: AdminUserResponse = await response.json();
       
       if (response.ok) {
-        setSuccess(`Admin user created/verified: ${data.email}. ${data.password ? 'Check console for password.' : ''}`);
+        setSuccess(`Admin user ${data.message ? 'created/verified' : 'processed'}: ${data.email || 'admin@example.com'}. ${data.password ? 'Check console for password.' : ''}`);
         if (data.password) {
           console.log('Admin password:', 'Admin123!');
         }
       } else {
-        setError(`Failed to create admin: ${data.error}`);
+        setError(`Failed to create admin: ${data.error || 'Unknown error'}`);
       }
     } catch (err) {
-      setError('An unexpected error occurred while creating admin');
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(`Error creating admin: ${errorMessage}`);
       console.error(err);
     } finally {
       setLoading(false);
@@ -130,7 +158,7 @@ export default function AdminLoginDebug() {
           
           {connectionStatus && (
             <div className={`mt-4 p-3 rounded text-sm ${connectionStatus.includes('successful') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-              <pre className="whitespace-pre-wrap">{connectionStatus}</pre>
+              <pre className="whitespace-pre-wrap overflow-auto max-h-60">{connectionStatus}</pre>
             </div>
           )}
         </div>
