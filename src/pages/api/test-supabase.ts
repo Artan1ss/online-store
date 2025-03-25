@@ -28,8 +28,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Safely split the second part by '/'
       const pathParts = secondPart.split('/');
-      const hostPart = pathParts.length > 0 ? pathParts[0] : '';
-      const dbPart = pathParts.length > 1 ? pathParts[1] : '';
+      // Ensure these are definitely strings with default empty values if not found
+      const hostPart: string = pathParts.length > 0 ? pathParts[0] : '';
+      const dbPart: string = pathParts.length > 1 ? pathParts[1] : '';
       
       dbUrlInfo = {
         host: hostPart,
