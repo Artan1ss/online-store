@@ -181,7 +181,7 @@ export default function ProductsPage() {
       name: product.name,
       price: finalPrice,
       originalPrice: originalPrice,
-      image: product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/placeholder.png')
+      image: product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '') || '/placeholder.png'
     });
   };
 
