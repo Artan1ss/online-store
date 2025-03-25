@@ -85,8 +85,12 @@ if (process.env.NODE_ENV === 'production') {
   });
   
   // Log connection details (without showing credentials)
-  const dbUrlSafe = databaseUrl.replace(/\/\/[^:]+:[^@]+@/, '//USER:PASSWORD@');
-  console.log(`Database connection configured with optimized URL: ${dbUrlSafe}`);
+  if (databaseUrl) {
+    const dbUrlSafe = databaseUrl.replace(/\/\/[^:]+:[^@]+@/, '//USER:PASSWORD@');
+    console.log(`Database connection configured with optimized URL: ${dbUrlSafe}`);
+  } else {
+    console.warn('Database URL is undefined in production environment');
+  }
   
   if (directUrl) {
     const directUrlSafe = directUrl.replace(/\/\/[^:]+:[^@]+@/, '//USER:PASSWORD@');
