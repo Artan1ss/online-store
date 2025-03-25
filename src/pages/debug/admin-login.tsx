@@ -127,12 +127,20 @@ export default function AdminLoginDebug() {
       
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Admin Debug Login</h1>
-        <Link 
-          href="/"
-          className="text-blue-600 hover:text-blue-800"
-        >
-          Back to Home
-        </Link>
+        <div className="flex space-x-4">
+          <Link 
+            href="/debug/admin-bypass"
+            className="text-purple-600 hover:text-purple-800"
+          >
+            Try Admin Bypass
+          </Link>
+          <Link 
+            href="/"
+            className="text-blue-600 hover:text-blue-800"
+          >
+            Back to Home
+          </Link>
+        </div>
       </div>
       
       <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-6">
@@ -172,6 +180,10 @@ export default function AdminLoginDebug() {
         <div className="p-4">
           <p className="text-sm text-gray-600 mb-4">
             Creates a default admin user with email "admin@example.com" if one doesn't exist.
+            <br />
+            <span className="text-red-600 font-medium">
+              If this fails, try the Admin Bypass option instead.
+            </span>
           </p>
           <button
             onClick={createAdminUser}

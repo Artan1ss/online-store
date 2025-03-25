@@ -19,6 +19,8 @@ type ErrorResponse = {
   success: false;
   error: string;
   info?: string;
+  details?: any;
+  env?: any;
 };
 
 type ApiResponse = SuccessResponse | ErrorResponse;
@@ -34,6 +36,16 @@ export default async function handler(
     });
   }
 
+  // Debug environment variables
+  const envDebug = {
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    ALLOW_ADMIN_CREATION: process.env.ALLOW_ADMIN_CREATION,
+    allowCreation: process.env.ALLOW_ADMIN_CREATION === 'true'
+  };
+
+  console.log('Admin creation environment variables:', envDebug);
+
   // A simple security check to prevent unwanted admin creation
   // In production, you might want more security (like a special token)
   const allowAdminCreation = process.env.VERCEL_ENV === 'production' 
@@ -44,7 +56,9 @@ export default async function handler(
     return res.status(403).json({ 
       success: false,
       error: 'Admin creation not allowed in this environment',
-      info: 'Set ALLOW_ADMIN_CREATION=true in your environment variables to enable this functionality'
+      info: 'Set ALLOW_ADMIN_CREATION=true in your environment variables to enable this functionality',
+      details: `Current value: ${process.env.ALLOW_ADMIN_CREATION}`,
+      env: envDebug
     });
   }
 
@@ -101,7 +115,9 @@ export default async function handler(
     
     return res.status(500).json({ 
       success: false,
-      error: errorMessage
+      error: errorMessage,
+      details: error instanceof Error ? error.stack : String(error),
+      env: envDebug
     });
   }
 } 
