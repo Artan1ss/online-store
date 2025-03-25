@@ -64,6 +64,8 @@ export default function OrdersPage() {
       }, 3000);
       return () => clearTimeout(timer);
     }
+    // Return empty cleanup function for the case when there's no successMessage
+    return () => {};
   }, [successMessage]);
 
   const fetchOrders = async () => {
