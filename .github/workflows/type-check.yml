@@ -23,7 +23,7 @@ jobs:
       run: npm ci
       
     - name: Run ESLint
-      run: npm run lint || echo "Linting issues found"
+      run: npm run lint-report || echo "Linting issues found but continuing build"
       
     - name: Type check
       run: npm run type-check

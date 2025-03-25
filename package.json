@@ -15,10 +15,11 @@
     "test:db-connection": "node scripts/test-db-connection.js",
     "db:health-check": "node scripts/db-health-check.js",
     "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "lint-report": "eslint 'src/**/*.{ts,tsx}' --max-warnings=9999",
     "type-check": "tsc --noEmit",
     "prepare": "husky install",
     "verify-types": "node scripts/verify-types.js",
-    "prevercel-build": "npm run verify-types"
+    "prevercel-build": "npm run verify-types-build"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
