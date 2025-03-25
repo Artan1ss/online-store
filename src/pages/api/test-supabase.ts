@@ -23,8 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Extract components without revealing sensitive info
     const urlParts = url.split('@');
     if (urlParts.length > 1) {
-      // Get the part after the @ symbol
-      const secondPart = urlParts[1];
+      // We know the second part exists because we checked urlParts.length > 1
+      const secondPart = urlParts[1] as string; // Type assertion to ensure TypeScript knows it's defined
       
       // Safely split the second part by '/'
       const pathParts = secondPart.split('/');
