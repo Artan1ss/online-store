@@ -49,13 +49,13 @@ async function connectWithRetry(client: PrismaClient, maxRetries = 5): Promise<v
       console.log('Successfully connected to the database');
       return;
     } catch (error) {
-      lastError = error;
+      lastError = error as Error;
       retries++;
       const delay = Math.min(Math.pow(2, retries) * 1000, 10000); // Exponential backoff, max 10s
       
       console.error(
         `Database connection attempt ${retries} failed. Retrying in ${delay}ms...`,
-        error.message || error
+        error instanceof Error ? error.message : String(error)
       );
       
       // Wait before retrying
