@@ -1,11 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { getVercelDatabaseUrls } from './connection-url';
+import { Prisma } from '@prisma/client';
 
 // Check if we're in a production environment
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Determine whether to use logging
-const prismaLogLevels = isProduction 
+const prismaLogLevels: Prisma.LogLevel[] = isProduction 
   ? ['error', 'warn'] 
   : ['query', 'info', 'warn', 'error'];
 
