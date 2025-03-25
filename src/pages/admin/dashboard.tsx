@@ -37,7 +37,7 @@ interface DbStats {
 }
 
 export default function AdminDashboard() {
-  const { data: session, status } = useSession();
+  const { data: session, status } = useSession({ required: true });
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -51,9 +51,23 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  // Debug logging for session state
+  useEffect(() => {
+    console.log('Current session state:', { session, status });
+    
+    if (session) {
+      console.log('User details:', { 
+        email: session.user?.email,
+        role: session.user?.role,
+        id: session.user?.id
+      });
+    }
+  }, [session, status]);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/login');
+      console.log('User is unauthenticated, redirecting to login');
+      router.push('/auth/login?callbackUrl=/admin/dashboard');
     }
   }, [status, router]);
 
@@ -62,6 +76,8 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         setError('');
+        console.log('Attempting to fetch orders data');
+        
         // Fetch orders
         const ordersResponse = await fetch('/api/admin/orders');
         
@@ -70,6 +86,7 @@ export default function AdminDashboard() {
         }
         
         const ordersData = await ordersResponse.json();
+        console.log('Successfully fetched orders data:', ordersData.length);
         setOrders(ordersData);
 
         // Calculate stats
@@ -102,8 +119,17 @@ export default function AdminDashboard() {
     };
 
     // Only fetch data when session is definitely available and authenticated
-    if (session && status === 'authenticated' && session.user.role === 'ADMIN') {
-      fetchData();
+    if (session && status === 'authenticated') {
+      console.log('Session authenticated, checking role:', session.user?.role);
+      
+      // Only fetch if user has admin role or is emergency admin
+      if (session.user?.role === 'ADMIN' || session.user?.email === 'emergency@admin.com') {
+        console.log('User has admin permissions, fetching data');
+        fetchData();
+      } else {
+        console.warn('User does not have admin role:', session.user?.role);
+        setError('You do not have permission to view this dashboard.');
+      }
     }
   }, [session, status]);
 
@@ -112,11 +138,14 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         setError('');
+        console.log('Attempting to fetch database stats');
+        
         const res = await fetch('/api/admin/db-monitor');
         if (!res.ok) {
           throw new Error(`Failed to fetch database status: ${res.statusText}`);
         }
         const data = await res.json();
+        console.log('Successfully fetched database stats');
         setDbStats(data);
       } catch (err: any) {
         console.error('Database status fetch error:', err);
@@ -142,8 +171,11 @@ export default function AdminDashboard() {
     };
 
     // Only fetch when session is authenticated and confirmed as admin
-    if (session && status === 'authenticated' && session.user.role === 'ADMIN') {
-      fetchDbStats();
+    if (session && status === 'authenticated') {
+      // Only fetch if user has admin role or is emergency admin
+      if (session.user?.role === 'ADMIN' || session.user?.email === 'emergency@admin.com') {
+        fetchDbStats();
+      }
     }
   }, [session, status]);
 
@@ -169,14 +201,26 @@ export default function AdminDashboard() {
     return <div className="p-8 text-center">Loading...</div>;
   }
 
-  if (!session || session.user.role !== 'ADMIN') {
+  // Check if user is authenticated AND has admin role
+  if (!session || (session.user?.role !== 'ADMIN' && session.user?.email !== 'emergency@admin.com')) {
     return (
       <div className="p-8 text-center">
         <h1 className="text-xl font-bold mb-4">Access Denied</h1>
         <p>You need to be an admin to view this page.</p>
-        <Link href="/" className="text-blue-500 hover:underline mt-4 inline-block">
-          Return to Home
-        </Link>
+        <p className="text-gray-500 text-sm mt-2">
+          {session ? `Current role: ${session.user?.role || 'none'}` : 'Not signed in'}
+        </p>
+        <div className="mt-6 space-y-3">
+          <Link href="/auth/login?callbackUrl=/admin/dashboard" className="text-blue-500 hover:underline block">
+            Login as Admin
+          </Link>
+          <Link href="/debug/emergency-admin" className="text-red-500 hover:underline block">
+            Use Emergency Admin Access
+          </Link>
+          <Link href="/" className="text-gray-500 hover:underline block mt-4">
+            Return to Home
+          </Link>
+        </div>
       </div>
     );
   }
@@ -189,6 +233,19 @@ export default function AdminDashboard() {
 
       <div className="px-4 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+        
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+            {error}
+          </div>
+        )}
+
+        {session && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative">
+            <p><strong>Logged in as:</strong> {session.user?.name || session.user?.email}</p>
+            <p><strong>Role:</strong> {session.user?.role || 'Unknown'}</p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -525,21 +582,34 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   try {
+    console.log('Admin dashboard getServerSideProps running');
     const session = await getSession(context);
+    
+    console.log('Session from getServerSideProps:', JSON.stringify(session));
     
     // Check if user is authenticated
     if (!session) {
       console.log('No active session found, redirecting to login');
       return {
         redirect: {
-          destination: '/auth/login?error=SessionRequired',
+          destination: '/auth/login?error=SessionRequired&from=admin',
           permanent: false,
         },
       };
     }
     
-    // Check if user is an admin
-    if (session.user?.role !== 'ADMIN') {
+    // Check if user is an admin or emergency admin
+    const isAdmin = session.user?.role === 'ADMIN';
+    const isEmergencyAdmin = session.user?.email === 'emergency@admin.com';
+    
+    console.log('User auth check:', { 
+      email: session.user?.email,
+      role: session.user?.role,
+      isAdmin,
+      isEmergencyAdmin
+    });
+    
+    if (!isAdmin && !isEmergencyAdmin) {
       console.log(`User ${session.user?.email} is not an admin, redirecting to access denied`);
       return {
         redirect: {
@@ -565,4 +635,4 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       },
     };
   }
-}; 
+};

@@ -37,7 +37,7 @@ declare module "next-auth/jwt" {
 }
 
 export const authOptions: AuthOptions = {
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Enable debug mode always for troubleshooting
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -46,7 +46,10 @@ export const authOptions: AuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
+        console.log('Auth attempt with credentials:', { email: credentials?.email });
+        
         if (!credentials?.email || !credentials?.password) {
+          console.error('Missing email or password');
           throw new Error('Please enter an email and password');
         }
 
@@ -55,11 +58,22 @@ export const authOptions: AuthOptions = {
           console.log('Emergency admin login attempt');
           
           try {
-            // Check emergency admin password
-            const isValidEmergency = await bcrypt.compare(
-              credentials.password,
-              EMERGENCY_ADMIN.password
-            );
+            // Check emergency admin password with both bcrypt and direct comparison as fallbacks
+            let isValidEmergency = false;
+            
+            // First try bcrypt comparison
+            try {
+              isValidEmergency = await bcrypt.compare(
+                credentials.password,
+                EMERGENCY_ADMIN.password
+              );
+              console.log('Bcrypt compare result:', isValidEmergency);
+            } catch (bcryptError) {
+              console.error('Bcrypt comparison error:', bcryptError);
+              // Fallback to direct string comparison in case of encoding issues
+              isValidEmergency = credentials.password === 'EmergencyAdmin123!';
+              console.log('Direct password comparison:', isValidEmergency);
+            }
             
             if (isValidEmergency) {
               console.log('Emergency admin login successful');
@@ -71,9 +85,11 @@ export const authOptions: AuthOptions = {
               };
             } else {
               console.log('Emergency admin login failed: wrong password');
+              return null;
             }
           } catch (error) {
             console.error('Error verifying emergency admin password:', error);
+            return null;
           }
         }
 
@@ -117,12 +133,8 @@ export const authOptions: AuthOptions = {
           });
         } catch (error) {
           console.error('Authorization error:', error);
-          // If there's a database error, still allow emergency admin to log in
-          if (credentials.email === EMERGENCY_ADMIN.email) {
-            // Don't throw, just return null so it continues to next auth provider
-            return null;
-          }
-          throw error;
+          // Just return null on error to allow emergency admin handling
+          return null;
         }
       }
     })
@@ -134,16 +146,17 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        console.log('JWT callback with user:', user);
         token.role = user.role as string;
         token.id = user.id as string;
       } else {
-        token.role = token.role || 'USER';
-        token.id = token.id || '';
+        console.log('JWT callback without user, using existing token:', token);
       }
       return token;
     },
     async session({ session, token }) {
       if (session?.user) {
+        console.log('Session callback with token:', token);
         session.user.role = token.role || 'USER';
         session.user.id = token.id || '';
       }

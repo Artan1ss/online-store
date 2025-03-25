@@ -7,6 +7,7 @@ import Link from 'next/link';
 export default function EmergencyAdminAccess() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const router = useRouter();
 
   const emergencyCredentials = {
@@ -18,23 +19,38 @@ export default function EmergencyAdminAccess() {
     try {
       setLoading(true);
       setMessage(null);
+      setDebugInfo(null);
+      
+      console.log('Attempting emergency login with:', emergencyCredentials.email);
       
       const result = await signIn('credentials', {
         redirect: false,
         email: emergencyCredentials.email,
-        password: emergencyCredentials.password
+        password: emergencyCredentials.password,
+        callbackUrl: '/admin/dashboard'
       });
+      
+      console.log('SignIn result:', JSON.stringify(result));
+      setDebugInfo(JSON.stringify(result, null, 2));
       
       if (result?.error) {
         setMessage(`Login failed: ${result.error}`);
+        console.error('Login error:', result.error);
+      } else if (result?.url) {
+        setMessage('Login successful! Redirecting...');
+        setTimeout(() => {
+          window.location.href = result.url; // Use window.location instead of router for hard redirect
+        }, 1500);
       } else {
         setMessage('Login successful! Redirecting...');
         setTimeout(() => {
-          router.push('/admin/dashboard');
+          window.location.href = '/admin/dashboard'; // Fallback redirect
         }, 1500);
       }
     } catch (error) {
+      console.error('Emergency login exception:', error);
       setMessage(`An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`);
+      setDebugInfo(error instanceof Error ? error.stack || 'No stack trace' : 'Unknown error type');
     } finally {
       setLoading(false);
     }
@@ -88,6 +104,13 @@ export default function EmergencyAdminAccess() {
             {message && (
               <div className={`p-3 rounded text-sm ${message.includes('successful') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
                 {message}
+              </div>
+            )}
+            
+            {debugInfo && (
+              <div className="mt-4 p-3 bg-gray-50 rounded border border-gray-200">
+                <h3 className="text-sm font-medium mb-2">Debug Information:</h3>
+                <pre className="text-xs overflow-auto max-h-40 whitespace-pre-wrap">{debugInfo}</pre>
               </div>
             )}
           </div>
