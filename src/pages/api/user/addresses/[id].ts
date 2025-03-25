@@ -115,15 +115,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Failed to find remaining addresses'
         );
 
-        // Check if there are any remaining addresses and if the first one has an id
-        if (remainingAddresses.length > 0 && remainingAddresses[0]?.id) {
-          await executePrismaOperation(
-            () => prisma.address.update({
-              where: { id: remainingAddresses[0].id },
-              data: { isDefault: true }
-            }),
-            'Failed to update new default address'
-          );
+        // Only update if there's at least one address and it has an ID
+        if (remainingAddresses.length > 0) {
+          const firstAddress = remainingAddresses[0];
+          if (firstAddress && firstAddress.id) {
+            await executePrismaOperation(
+              () => prisma.address.update({
+                where: { id: firstAddress.id },
+                data: { isDefault: true }
+              }),
+              'Failed to update new default address'
+            );
+          }
         }
       }
 
