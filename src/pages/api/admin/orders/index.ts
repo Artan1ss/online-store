@@ -1,35 +1,35 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { prisma, withPrismaClient } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]';
 
-const prisma = new PrismaClient();
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // 验证管理员权限
+  // Verify admin permissions
   const session = await getServerSession(req, res, authOptions);
   
   if (session?.user?.role !== 'ADMIN') {
-    return res.status(401).json({ message: '未授权访问' });
+    return res.status(401).json({ message: 'Unauthorized access' });
   }
 
-  // 处理GET请求 - 获取所有订单
+  // Handle GET request - get all orders
   if (req.method === 'GET') {
     try {
-      const orders = await prisma.order.findMany({
-        orderBy: {
-          createdAt: 'desc'
-        }
+      return await withPrismaClient(async (prisma) => {
+        const orders = await prisma.order.findMany({
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+        
+        return res.status(200).json(orders);
       });
-      
-      return res.status(200).json(orders);
     } catch (error) {
-      console.error('获取订单失败:', error);
-      return res.status(500).json({ message: '获取订单失败' });
+      console.error('Failed to get orders:', error);
+      return res.status(500).json({ message: 'Failed to get orders' });
     }
   }
 
-  // 处理POST请求 - 创建新订单
+  // Handle POST request - create new order
   if (req.method === 'POST') {
     try {
       const {
@@ -46,38 +46,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         items
       } = req.body;
 
-      const order = await prisma.order.create({
-        data: {
-          orderNumber,
-          customerName,
-          customerEmail,
-          customerPhone,
-          address,
-          city,
-          country,
-          postalCode,
-          status,
-          totalAmount,
-          total: totalAmount,
-          items: {
-            create: items.map((item: any) => ({
-              productId: item.productId,
-              name: item.name,
-              price: item.price,
-              quantity: item.quantity,
-              image: item.image
-            }))
+      return await withPrismaClient(async (prisma) => {
+        const order = await prisma.order.create({
+          data: {
+            orderNumber,
+            customerName,
+            customerEmail,
+            customerPhone,
+            address,
+            city,
+            country,
+            postalCode,
+            status,
+            totalAmount,
+            total: totalAmount,
+            items: {
+              create: items.map((item: any) => ({
+                productId: item.productId,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                image: item.image
+              }))
+            }
           }
-        }
-      });
+        });
 
-      return res.status(201).json(order);
+        return res.status(201).json(order);
+      });
     } catch (error) {
-      console.error('创建订单失败:', error);
-      return res.status(500).json({ message: '创建订单失败' });
+      console.error('Failed to create order:', error);
+      return res.status(500).json({ message: 'Failed to create order' });
     }
   }
 
-  // 如果不是支持的HTTP方法
-  return res.status(405).json({ message: '方法不允许' });
+  // If not a supported HTTP method
+  return res.status(405).json({ message: 'Method not allowed' });
 } 

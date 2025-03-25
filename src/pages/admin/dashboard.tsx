@@ -493,18 +493,45 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
-  
-  if (!session || session.user.role !== 'ADMIN') {
+  try {
+    const session = await getSession(context);
+    
+    // Check if user is authenticated
+    if (!session) {
+      console.log('No active session found, redirecting to login');
+      return {
+        redirect: {
+          destination: '/auth/login?error=SessionRequired',
+          permanent: false,
+        },
+      };
+    }
+    
+    // Check if user is an admin
+    if (session.user?.role !== 'ADMIN') {
+      console.log(`User ${session.user?.email} is not an admin, redirecting to access denied`);
+      return {
+        redirect: {
+          destination: '/auth/error?error=AccessDenied',
+          permanent: false,
+        },
+      };
+    }
+    
+    // If all checks pass, allow rendering the dashboard
+    return {
+      props: { 
+        initialSession: session
+      },
+    };
+  } catch (error) {
+    console.error('Error in getServerSideProps:', error);
+    // In case of any error, redirect to error page
     return {
       redirect: {
-        destination: '/login',
+        destination: '/auth/error?error=ServerError',
         permanent: false,
       },
     };
   }
-  
-  return {
-    props: {},
-  };
 }; 
