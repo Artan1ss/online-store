@@ -246,7 +246,10 @@ const ProductsManagement = () => {
     const formData = new FormData();
     
     for (let i = 0; i < e.target.files.length; i++) {
-      formData.append('images', e.target.files[i]);
+      const file = e.target.files[i];
+      if (file) {
+        formData.append('images', file);
+      }
     }
 
     try {
