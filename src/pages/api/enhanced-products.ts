@@ -38,8 +38,8 @@ export default async function handler(
 ) {
   console.log('Enhanced products API called');
   
-  // Get optimized database URLs
-  const { databaseUrl, directUrl } = getVercelDatabaseUrls();
+  // Get optimized database URL
+  const { databaseUrl } = getVercelDatabaseUrls();
   
   // Create a dedicated Prisma client with optimized connection settings
   const prisma = new PrismaClient({
